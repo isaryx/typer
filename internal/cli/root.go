@@ -211,6 +211,9 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		return err
 	}
+	if err := rejectExtraArgs("start", fs.Args()); err != nil {
+		return err
+	}
 
 	canonMode, err := text.CanonicalMode(strings.TrimSpace(mode))
 	if err != nil {
@@ -350,9 +353,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 		printRow("Net WPM", fmt.Sprintf("%.2f", net))
 		printRow("Adjusted WPM", fmt.Sprintf("%.2f", adjusted))
 		printRow("Accuracy", fmt.Sprintf("%.2f%%", acc))
-		if cons > 0 {
-			printRow("Consistency", fmt.Sprintf("%.2f", cons))
-		}
+		printRow("Consistency", fmt.Sprintf("%.2f", cons))
 		printRow("Errors", fmt.Sprintf("%d", errCount))
 		printRow("Time", formatElapsedMS(elapsedMS))
 	}
@@ -395,6 +396,9 @@ func runSet(args []string, stdout io.Writer) error {
 			printSetHelp(stdout)
 			return nil
 		}
+		return err
+	}
+	if err := rejectExtraArgs("set", fs.Args()); err != nil {
 		return err
 	}
 
@@ -468,6 +472,9 @@ func runHistory(args []string, stdout io.Writer) error {
 		}
 		return err
 	}
+	if err := rejectExtraArgs("history", fs.Args()); err != nil {
+		return err
+	}
 
 	store, err := storage.NewHistoryStore()
 	if err != nil {
@@ -511,6 +518,9 @@ func runStats(args []string, stdout io.Writer) error {
 		}
 		return err
 	}
+	if err := rejectExtraArgs("stats", fs.Args()); err != nil {
+		return err
+	}
 
 	store, err := storage.NewHistoryStore()
 	if err != nil {
@@ -548,6 +558,13 @@ func printCharCounts(out io.Writer, title string, counts []analytics.CharCount) 
 	for _, c := range counts {
 		fmt.Fprintf(out, "  - %-12s %d\n", c.Key, c.Count)
 	}
+}
+
+func rejectExtraArgs(command string, extras []string) error {
+	if len(extras) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s does not take positional arguments: %s", command, strings.Join(extras, " "))
 }
 
 func printHelp(out io.Writer) {

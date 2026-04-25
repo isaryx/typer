@@ -173,3 +173,16 @@ func TestQuoteProviderRemoteFallbackToSeed(t *testing.T) {
 		t.Fatalf("expected seed source, got %s", prompt.Source)
 	}
 }
+
+func TestQuoteProviderEmptySourceDefaultsToSeed(t *testing.T) {
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	p := NewQuoteProviderForTesting(cache, "", nil)
+
+	prompt, err := p.Next(context.Background(), Constraints{})
+	if err != nil {
+		t.Fatalf("expected seed default, got error: %v", err)
+	}
+	if prompt.Source != quoteSourceSeed {
+		t.Fatalf("expected seed source by default, got %q", prompt.Source)
+	}
+}

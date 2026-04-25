@@ -15,13 +15,14 @@ import (
 )
 
 const (
-	testFlagMode      = "--mode"
-	testFlagStrict    = "--strict"
-	testFlagLast      = "--last"
-	testFlagReset     = "--reset-progress"
-	testFlagWordsFile = "--words-file"
-	testHistoryFile   = "history.json"
-	unexpectedErrFmt  = "unexpected error: %v"
+	testFlagMode            = "--mode"
+	testFlagStrict          = "--strict"
+	testFlagLast            = "--last"
+	testFlagReset           = "--reset-progress"
+	testFlagWordsFile       = "--words-file"
+	testHistoryFile         = "history.json"
+	unexpectedErrFmt        = "unexpected error: %v"
+	expectedPositionalError = "expected error for positional args"
 )
 
 type presenceFlagsCase struct {
@@ -31,6 +32,25 @@ type presenceFlagsCase struct {
 	wantStrict bool
 	wantIndef  bool
 	wantErr    bool
+}
+
+func setupTestHistoryStoreFactory(t *testing.T, seed ...model.SessionResult) string {
+	t.Helper()
+
+	originalFactory := newHistoryStore
+	t.Cleanup(func() { newHistoryStore = originalFactory })
+
+	path := filepath.Join(t.TempDir(), testHistoryFile)
+	store := storage.NewHistoryStoreAt(path)
+	for i, result := range seed {
+		if err := store.Append(result); err != nil {
+			t.Fatalf("Append %d: %v", i+1, err)
+		}
+	}
+	newHistoryStore = func() (*storage.HistoryStore, error) {
+		return storage.NewHistoryStoreAt(path), nil
+	}
+	return path
 }
 
 func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
@@ -59,18 +79,102 @@ func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
 
 func TestExtractPresenceFlags(t *testing.T) {
 	tests := []presenceFlagsCase{
-		{"empty", nil, nil, false, false, false},
-		{"no flags", []string{testFlagMode, "words"}, []string{testFlagMode, "words"}, false, false, false},
-		{"bare strict", []string{testFlagStrict}, nil, true, false, false},
-		{"strict then flags", []string{testFlagStrict, testFlagMode, "words"}, []string{testFlagMode, "words"}, true, false, false},
-		{"strict shorthand", []string{"-s", "-m", "words"}, []string{"-m", "words"}, true, false, false},
-		{"bare indefinite", []string{"--indefinite"}, nil, false, true, false},
-		{"indef shorthand", []string{"-i", "-m", "w"}, []string{"-m", "w"}, false, true, false},
-		{"strict and indefinite", []string{"-s", "-i", "-w", "3"}, []string{"-w", "3"}, true, true, false},
-		{"eq strict", []string{testFlagStrict + "=false"}, nil, false, false, true},
-		{"eq indefinite", []string{"-i=true"}, nil, false, false, true},
-		{"space true after strict", []string{testFlagStrict, "true"}, nil, false, false, true},
-		{"word after strict ok", []string{testFlagStrict, "hello"}, []string{"hello"}, true, false, false},
+		{
+			name:       "empty",
+			args:       nil,
+			wantRest:   nil,
+			wantStrict: false,
+			wantIndef:  false,
+			wantErr:    false,
+		},
+		{
+			name:       "no flags",
+			args:       []string{testFlagMode, "words"},
+			wantRest:   []string{testFlagMode, "words"},
+			wantStrict: false,
+			wantIndef:  false,
+			wantErr:    false,
+		},
+		{
+			name:       "bare strict",
+			args:       []string{testFlagStrict},
+			wantRest:   nil,
+			wantStrict: true,
+			wantIndef:  false,
+			wantErr:    false,
+		},
+		{
+			name:       "strict then flags",
+			args:       []string{testFlagStrict, testFlagMode, "words"},
+			wantRest:   []string{testFlagMode, "words"},
+			wantStrict: true,
+			wantIndef:  false,
+			wantErr:    false,
+		},
+		{
+			name:       "strict shorthand",
+			args:       []string{"-s", "-m", "words"},
+			wantRest:   []string{"-m", "words"},
+			wantStrict: true,
+			wantIndef:  false,
+			wantErr:    false,
+		},
+		{
+			name:       "bare indefinite",
+			args:       []string{"--indefinite"},
+			wantRest:   nil,
+			wantStrict: false,
+			wantIndef:  true,
+			wantErr:    false,
+		},
+		{
+			name:       "indef shorthand",
+			args:       []string{"-i", "-m", "w"},
+			wantRest:   []string{"-m", "w"},
+			wantStrict: false,
+			wantIndef:  true,
+			wantErr:    false,
+		},
+		{
+			name:       "strict and indefinite",
+			args:       []string{"-s", "-i", "-w", "3"},
+			wantRest:   []string{"-w", "3"},
+			wantStrict: true,
+			wantIndef:  true,
+			wantErr:    false,
+		},
+		{
+			name:       "eq strict",
+			args:       []string{testFlagStrict + "=false"},
+			wantRest:   nil,
+			wantStrict: false,
+			wantIndef:  false,
+			wantErr:    true,
+		},
+		{
+			name:       "eq indefinite",
+			args:       []string{"-i=true"},
+			wantRest:   nil,
+			wantStrict: false,
+			wantIndef:  false,
+			wantErr:    true,
+		},
+		{
+			name:       "space true after strict",
+			args:       []string{testFlagStrict, "true"},
+			wantRest:   nil,
+			wantStrict: false,
+			wantIndef:  false,
+			wantErr:    true,
+		},
+		{
+			name:       "word after strict ok",
+			args:       []string{testFlagStrict, "hello"},
+			wantRest:   []string{"hello"},
+			wantStrict: true,
+			wantIndef:  false,
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -167,17 +271,19 @@ func TestRunStartHelpShortCircuits(t *testing.T) {
 	}
 }
 
-func TestExecuteResetProgressConfirm(t *testing.T) {
-	originalFactory := newHistoryStore
-	t.Cleanup(func() { newHistoryStore = originalFactory })
+func TestRunStartRejectsPositionalArgs(t *testing.T) {
+	var stdout bytes.Buffer
+	err := runStart(context.Background(), []string{"--strict", "hello"}, strings.NewReader(""), &stdout)
+	if err == nil {
+		t.Fatal(expectedPositionalError)
+	}
+	if !strings.Contains(err.Error(), "start does not take positional arguments") {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
 
-	path := filepath.Join(t.TempDir(), testHistoryFile)
-	if err := storage.NewHistoryStoreAt(path).Append(model.SessionResult{ID: "seed", StartedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("Append: %v", err)
-	}
-	newHistoryStore = func() (*storage.HistoryStore, error) {
-		return storage.NewHistoryStoreAt(path), nil
-	}
+func TestExecuteResetProgressConfirm(t *testing.T) {
+	path := setupTestHistoryStoreFactory(t, model.SessionResult{ID: "seed", StartedAt: time.Unix(1, 0)})
 
 	var stdout, stderr bytes.Buffer
 	if err := Execute(context.Background(), []string{testFlagReset}, strings.NewReader("y\n"), &stdout, &stderr); err != nil {
@@ -199,17 +305,7 @@ func TestExecuteResetProgressConfirm(t *testing.T) {
 }
 
 func TestExecuteResetProgressCancel(t *testing.T) {
-	originalFactory := newHistoryStore
-	t.Cleanup(func() { newHistoryStore = originalFactory })
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, testHistoryFile)
-	if err := storage.NewHistoryStoreAt(path).Append(model.SessionResult{ID: "seed", StartedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("Append: %v", err)
-	}
-	newHistoryStore = func() (*storage.HistoryStore, error) {
-		return storage.NewHistoryStoreAt(path), nil
-	}
+	path := setupTestHistoryStoreFactory(t, model.SessionResult{ID: "seed", StartedAt: time.Unix(1, 0)})
 
 	var stdout, stderr bytes.Buffer
 	err := Execute(context.Background(), []string{testFlagReset}, strings.NewReader("n\n"), &stdout, &stderr)
@@ -232,11 +328,7 @@ func TestExecuteResetProgressCancel(t *testing.T) {
 }
 
 func TestExecuteResetProgressRejectsExtraArgs(t *testing.T) {
-	originalFactory := newHistoryStore
-	t.Cleanup(func() { newHistoryStore = originalFactory })
-	newHistoryStore = func() (*storage.HistoryStore, error) {
-		return storage.NewHistoryStoreAt(filepath.Join(t.TempDir(), testHistoryFile)), nil
-	}
+	setupTestHistoryStoreFactory(t)
 
 	var stdout, stderr bytes.Buffer
 	err := Execute(context.Background(), []string{testFlagReset, "extra"}, strings.NewReader(""), &stdout, &stderr)
@@ -272,6 +364,18 @@ func TestPrintMetricsTableSummaryIncludesAvgAdjustedWPM(t *testing.T) {
 	}
 }
 
+func TestPrintMetricsTableIncludesConsistencyWhenZero(t *testing.T) {
+	var out bytes.Buffer
+	printMetricsTable(&out, "Session result", 50.0, 45.0, 40.0, 90.0, 0, 2, 8_000, false)
+	got := out.String()
+	if !strings.Contains(got, "Consistency") {
+		t.Fatalf("expected Consistency row, got %q", got)
+	}
+	if !strings.Contains(got, "0.00") {
+		t.Fatalf("expected zero consistency value, got %q", got)
+	}
+}
+
 func TestRunVersionPrintsVersion(t *testing.T) {
 	var out bytes.Buffer
 	if err := runVersion(&out); err != nil {
@@ -289,6 +393,17 @@ func TestRunSetRequiresAtLeastOneFlag(t *testing.T) {
 		t.Fatal("expected runSet to fail without flags")
 	}
 	if !strings.Contains(err.Error(), "set requires --words-file and/or --passages-file") {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
+func TestRunSetRejectsPositionalArgs(t *testing.T) {
+	var out bytes.Buffer
+	err := runSet([]string{testFlagWordsFile, "words.txt", "extra"}, &out)
+	if err == nil {
+		t.Fatal(expectedPositionalError)
+	}
+	if !strings.Contains(err.Error(), "set does not take positional arguments") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
@@ -405,6 +520,17 @@ func TestRunHistoryEmptyAndTruncatedListing(t *testing.T) {
 	}
 }
 
+func TestRunHistoryRejectsPositionalArgs(t *testing.T) {
+	var out bytes.Buffer
+	err := runHistory([]string{"extra"}, &out)
+	if err == nil {
+		t.Fatal(expectedPositionalError)
+	}
+	if !strings.Contains(err.Error(), "history does not take positional arguments") {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
 func TestRunStatsEmptyAndSummaryOutput(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -455,6 +581,17 @@ func TestRunStatsEmptyAndSummaryOutput(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in stats output: %q", want, got)
 		}
+	}
+}
+
+func TestRunStatsRejectsPositionalArgs(t *testing.T) {
+	var out bytes.Buffer
+	err := runStats([]string{"extra"}, &out)
+	if err == nil {
+		t.Fatal(expectedPositionalError)
+	}
+	if !strings.Contains(err.Error(), "stats does not take positional arguments") {
+		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
 

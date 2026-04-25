@@ -19,6 +19,13 @@ import (
 
 const typeFitURL = "https://type.fit/api/quotes"
 const defaultRemoteQuoteLimit = 250
+const (
+	quoteSourceAuto   = "auto"
+	quoteSourceRemote = "remote"
+	quoteSourceCache  = "cache"
+	quoteSourceSeed   = "seed"
+	quoteSourceTypeFit = "type.fit"
+)
 
 // maxRemoteBodyBytes caps the response body from the third-party quote API so a
 // hostile or compromised upstream cannot exhaust memory before we parse.
@@ -63,7 +70,7 @@ func (p *QuoteProvider) Name() string {
 func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, error) {
 	source := strings.ToLower(strings.TrimSpace(c.Source))
 	if source == "" {
-		source = "remote"
+		source = quoteSourceSeed
 	}
 
 	quotes, err := p.loadQuotes(ctx, source)
@@ -89,14 +96,21 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 
 func (p *QuoteProvider) loadQuotes(ctx context.Context, source string) ([]storage.CachedQuote, error) {
 	switch source {
-	case "seed":
+	case quoteSourceSeed:
 		return p.seedQuotes()
-	case "cache":
+	case quoteSourceCache:
 		return p.cacheThenSeed()
-	case "remote", "auto":
+	case quoteSourceRemote, quoteSourceAuto:
 		return p.remoteThenCacheThenSeed(ctx)
 	default:
-		return nil, fmt.Errorf("unsupported quote source %q (valid: auto, remote, cache, seed)", source)
+		return nil, fmt.Errorf(
+			"unsupported quote source %q (valid: %s, %s, %s, %s)",
+			source,
+			quoteSourceAuto,
+			quoteSourceRemote,
+			quoteSourceCache,
+			quoteSourceSeed,
+		)
 	}
 }
 
@@ -155,7 +169,7 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 		quotes = append(quotes, storage.CachedQuote{
 			Content: content,
 			Author:  sanitizeQuoteField(item.Author, maxQuoteRuneLen),
-			Source:  "type.fit",
+			Source:  quoteSourceTypeFit,
 		})
 		if len(quotes) >= defaultRemoteQuoteLimit {
 			break
@@ -176,7 +190,7 @@ func (p *QuoteProvider) seedQuotes() ([]storage.CachedQuote, error) {
 		return nil, err
 	}
 	for i := range quotes {
-		quotes[i].Source = "seed"
+		quotes[i].Source = quoteSourceSeed
 	}
 	return quotes, nil
 }
