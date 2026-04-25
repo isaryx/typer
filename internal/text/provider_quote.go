@@ -175,6 +175,9 @@ func (p *QuoteProvider) seedQuotes() ([]storage.CachedQuote, error) {
 	if err := json.Unmarshal(assets.QuotesSeed, &quotes); err != nil {
 		return nil, err
 	}
+	for i := range quotes {
+		quotes[i].Source = "seed"
+	}
 	return quotes, nil
 }
 

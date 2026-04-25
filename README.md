@@ -83,6 +83,12 @@ Download the latest archive from this repository's GitHub Releases page, then ex
 - macOS/Linux: extract `.tar.gz` and move `typer` to somewhere like `/usr/local/bin`.
 - Windows: extract `.zip` and add the folder containing `typer.exe` to `PATH`.
 
+## Project Docs
+
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+
 ## Open-source libraries
 
 The typing session UI is built with:
@@ -94,11 +100,12 @@ Other entries in `go.sum` are transitive dependencies (Charm’s terminal stack,
 
 ## Notes
 
-- Quote mode remote source currently uses `https://type.fit/api/quotes`.
+- Quote mode remote source uses `https://type.fit/api/quotes`.
+- Quotes mode source defaults to `seed`.
 - Fallback policy for quote mode:
-  - `remote` (default), `auto`: try remote API, then cache, then seed
+  - `remote`, `auto`: try remote API, then cache, then seed
   - `cache`: cache, then seed
-  - `seed`: seed only
+  - `seed` (default): seed only
 - Session UX:
   - Current target word is highlighted.
   - Press `space` to submit current word and advance to next word.
@@ -142,6 +149,13 @@ These formulas are implemented in `internal/scoring/scoring.go`.
 - All displayed/stored metric values are rounded to 2 decimals.
 - **Consistency** is a separate `0-100` steadiness score derived from per-word gross-WPM samples (not an accuracy metric).
 - **Time** starts on the first typed rune and ends when the session completes (or aborts).
+
+## Local Data & Privacy
+
+- `typer` stores session history and settings on your machine only.
+- Session history includes prompt content and your typed text (`typed_text`) so you can review stats later.
+- On macOS/Linux, data is written under your user config/cache directories (for example, `~/.config/typer` and `~/.cache/typer` on Linux).
+- The storage layer writes config and cache files with user-only permissions where supported (`0700` directories, `0600` files).
 
 ## Data Credits
 
