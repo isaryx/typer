@@ -10,24 +10,49 @@ import (
 	"typer/internal/model"
 )
 
+const (
+	historyJSONFile = "history.json"
+	errListFmt      = "List: %v"
+	errAppendFmt    = "Append: %v"
+)
+
 func newHistoryStoreAt(t *testing.T) *HistoryStore {
 	t.Helper()
-	return &HistoryStore{path: filepath.Join(t.TempDir(), "history.json")}
+	return &HistoryStore{path: filepath.Join(t.TempDir(), historyJSONFile)}
 }
 
-func TestHistoryStore_EmptyList(t *testing.T) {
+func TestNewHistoryStoreUsesConfigDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", home)
+		t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+		t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
+	}
+	want := filepath.Join(typerConfigDirForTestHome(home), historyJSONFile)
+
+	store, err := NewHistoryStore()
+	if err != nil {
+		t.Fatalf("NewHistoryStore: %v", err)
+	}
+	if store.path != want {
+		t.Fatalf("history path = %q, want %q", store.path, want)
+	}
+}
+
+func TestHistoryStoreEmptyList(t *testing.T) {
 	store := newHistoryStoreAt(t)
 
 	got, err := store.List(10)
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatalf(errListFmt, err)
 	}
 	if len(got) != 0 {
 		t.Fatalf("expected empty list, got %d", len(got))
 	}
 }
 
-func TestHistoryStore_AppendAndListReverseOrder(t *testing.T) {
+func TestHistoryStoreAppendAndListReverseOrder(t *testing.T) {
 	store := newHistoryStoreAt(t)
 
 	first := model.SessionResult{ID: "1", StartedAt: time.Unix(100, 0)}
@@ -41,7 +66,7 @@ func TestHistoryStore_AppendAndListReverseOrder(t *testing.T) {
 
 	got, err := store.List(0) // 0 = unlimited
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatalf(errListFmt, err)
 	}
 	if len(got) != 3 {
 		t.Fatalf("expected 3 sessions, got %d", len(got))
@@ -55,7 +80,7 @@ func TestHistoryStore_AppendAndListReverseOrder(t *testing.T) {
 	}
 }
 
-func TestHistoryStore_AppendEnforcesMaxSessions(t *testing.T) {
+func TestHistoryStoreAppendEnforcesMaxSessions(t *testing.T) {
 	// Seed the file directly to avoid O(n^2) full-file rewrites in a loop.
 	store := newHistoryStoreAt(t)
 	seed := make([]model.SessionResult, maxHistorySessions)
@@ -69,13 +94,13 @@ func TestHistoryStore_AppendEnforcesMaxSessions(t *testing.T) {
 	// Appending past the cap must evict the oldest entries, not grow the log.
 	for i := 0; i < 3; i++ {
 		if err := store.Append(model.SessionResult{ID: "new"}); err != nil {
-			t.Fatalf("Append: %v", err)
+			t.Fatalf(errAppendFmt, err)
 		}
 	}
 
 	all, err := store.List(0)
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatalf(errListFmt, err)
 	}
 	if len(all) != maxHistorySessions {
 		t.Fatalf("expected retained count %d, got %d", maxHistorySessions, len(all))
@@ -88,15 +113,15 @@ func TestHistoryStore_AppendEnforcesMaxSessions(t *testing.T) {
 	}
 }
 
-func TestHistoryStore_WritesTightPermissions(t *testing.T) {
+func TestHistoryStoreWritesTightPermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX-style file modes are not meaningful on Windows")
 	}
 	dir := t.TempDir()
-	path := filepath.Join(dir, "history.json")
+	path := filepath.Join(dir, historyJSONFile)
 	store := &HistoryStore{path: path}
 	if err := store.Append(model.SessionResult{ID: "1"}); err != nil {
-		t.Fatalf("Append: %v", err)
+		t.Fatalf(errAppendFmt, err)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -107,16 +132,16 @@ func TestHistoryStore_WritesTightPermissions(t *testing.T) {
 	}
 }
 
-func TestHistoryStore_ListTruncatesToLast(t *testing.T) {
+func TestHistoryStoreListTruncatesToLast(t *testing.T) {
 	store := newHistoryStoreAt(t)
 	for i := 0; i < 5; i++ {
 		if err := store.Append(model.SessionResult{ID: string(rune('A' + i))}); err != nil {
-			t.Fatalf("Append: %v", err)
+			t.Fatalf(errAppendFmt, err)
 		}
 	}
 	got, err := store.List(2)
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatalf(errListFmt, err)
 	}
 	if len(got) != 2 {
 		t.Fatalf("expected 2 sessions, got %d", len(got))
@@ -126,13 +151,13 @@ func TestHistoryStore_ListTruncatesToLast(t *testing.T) {
 	}
 }
 
-func TestHistoryStore_ResetClearsSessions(t *testing.T) {
+func TestHistoryStoreResetClearsSessions(t *testing.T) {
 	store := newHistoryStoreAt(t)
 	if err := store.Append(model.SessionResult{ID: "1"}); err != nil {
-		t.Fatalf("Append: %v", err)
+		t.Fatalf(errAppendFmt, err)
 	}
 	if err := store.Append(model.SessionResult{ID: "2"}); err != nil {
-		t.Fatalf("Append: %v", err)
+		t.Fatalf(errAppendFmt, err)
 	}
 
 	if err := store.Reset(); err != nil {
@@ -141,9 +166,41 @@ func TestHistoryStore_ResetClearsSessions(t *testing.T) {
 
 	got, err := store.List(0)
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatalf(errListFmt, err)
 	}
 	if len(got) != 0 {
 		t.Fatalf("expected empty list after reset, got %d", len(got))
+	}
+}
+
+func TestHistoryStoreReadMalformedJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), historyJSONFile)
+	if err := os.WriteFile(path, []byte("{"), 0o644); err != nil {
+		t.Fatalf("write malformed history: %v", err)
+	}
+	store := NewHistoryStoreAt(path)
+	if _, err := store.read(); err == nil {
+		t.Fatal("expected malformed history error")
+	}
+}
+
+func TestHistoryStoreReadNormalizesLegacyVersion(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	if err := writeJSONFileAtomic(store.path, model.HistoryFile{
+		Version:  0,
+		Sessions: []model.SessionResult{{ID: "legacy"}},
+	}); err != nil {
+		t.Fatalf("seed legacy history: %v", err)
+	}
+
+	got, err := store.read()
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got.Version != historyVersion {
+		t.Fatalf("Version = %d, want %d", got.Version, historyVersion)
+	}
+	if len(got.Sessions) != 1 || got.Sessions[0].ID != "legacy" {
+		t.Fatalf("unexpected sessions: %#v", got.Sessions)
 	}
 }

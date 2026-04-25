@@ -5,12 +5,16 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"typer/internal/model"
 )
 
-func TestCommitCurrentWord_StrictMismatchBlocksAdvance(t *testing.T) {
+const helloWorldPrompt = "hello world"
+
+func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -26,9 +30,9 @@ func TestCommitCurrentWord_StrictMismatchBlocksAdvance(t *testing.T) {
 	}
 }
 
-func TestAppendRunes_StrictRejectsWrongActiveChar(t *testing.T) {
+func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -49,10 +53,10 @@ func TestAppendRunes_StrictRejectsWrongActiveChar(t *testing.T) {
 	}
 }
 
-func TestCommitCurrentWord_NonStrictAdvancesAndClearsPrompt(t *testing.T) {
+func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 	now := time.Unix(100, 0)
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time {
 			now = now.Add(time.Second)
@@ -74,9 +78,9 @@ func TestCommitCurrentWord_NonStrictAdvancesAndClearsPrompt(t *testing.T) {
 	}
 }
 
-func TestCommitCurrentWord_StrictMatchAdvancesAndClearsPrompt(t *testing.T) {
+func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -92,9 +96,9 @@ func TestCommitCurrentWord_StrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 	}
 }
 
-func TestAppendRunes_TracksKeystrokeAccuracy(t *testing.T) {
+func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -111,9 +115,9 @@ func TestAppendRunes_TracksKeystrokeAccuracy(t *testing.T) {
 	}
 }
 
-func TestCommitCurrentWord_TracksUncorrectedErrors(t *testing.T) {
+func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -126,7 +130,7 @@ func TestCommitCurrentWord_TracksUncorrectedErrors(t *testing.T) {
 	}
 }
 
-func TestRenderWords_WrapsToTerminalWidth(t *testing.T) {
+func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 	// Many one-letter "words"; each styled segment is wider than a bare rune but still tiny.
 	content := strings.TrimSpace(strings.Repeat("x ", 60))
 	m := newTypingSessionModel(
@@ -142,7 +146,7 @@ func TestRenderWords_WrapsToTerminalWidth(t *testing.T) {
 	}
 }
 
-func TestWrapWidth_capsWideTerminal(t *testing.T) {
+func TestWrapWidthCapsWideTerminal(t *testing.T) {
 	m := newTypingSessionModel(
 		model.Prompt{Content: "hello"},
 		false,
@@ -159,9 +163,9 @@ func TestWrapWidth_capsWideTerminal(t *testing.T) {
 	}
 }
 
-func TestView_IncludesPromptModeInMetaLine(t *testing.T) {
+func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world", Mode: model.ModeWords},
+		model.Prompt{Content: helloWorldPrompt, Mode: model.ModeWords},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
@@ -172,11 +176,11 @@ func TestView_IncludesPromptModeInMetaLine(t *testing.T) {
 	}
 }
 
-func TestAppendRunes_StartsTimerOnFirstKeystroke(t *testing.T) {
+func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 	t0 := time.Unix(100, 0)
 	now := t0
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+					model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time { return now },
 		false,
@@ -198,10 +202,10 @@ func TestAppendRunes_StartsTimerOnFirstKeystroke(t *testing.T) {
 	}
 }
 
-func TestResult_UsesEndTimeWhenNoTypingOccurred(t *testing.T) {
+func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 	now := time.Unix(200, 0)
 	m := newTypingSessionModel(
-		model.Prompt{Content: "hello world"},
+		model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time { return now },
 		false,
@@ -215,5 +219,115 @@ func TestResult_UsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 	}
 	if !got.EndedAt.Equal(now.UTC()) {
 		t.Fatalf("EndedAt = %v, want %v", got.EndedAt, now.UTC())
+	}
+}
+
+func TestInitReturnsNilCommand(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+	)
+	if cmd := m.Init(); cmd != nil {
+		t.Fatalf("expected nil init command, got %v", cmd)
+	}
+}
+
+func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+	)
+	m.current = "hé"
+	gotModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	updated := gotModel.(typingSessionModel)
+	if updated.current != "h" {
+		t.Fatalf("current = %q, want %q", updated.current, "h")
+	}
+}
+
+func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
+	now := time.Unix(100, 0)
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello"},
+		false,
+		func() time.Time {
+			now = now.Add(time.Second)
+			return now
+		},
+		false,
+	)
+	m.current = "hello"
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updated := gotModel.(typingSessionModel)
+	if !updated.isDone() {
+		t.Fatal("expected session to be done after committing only word")
+	}
+	if updated.endedAt.IsZero() {
+		t.Fatal("expected endedAt to be set on completion")
+	}
+	if cmd == nil {
+		t.Fatal("expected quit command when session completes")
+	}
+}
+
+func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
+	now := time.Unix(100, 0)
+	m := newTypingSessionModel(
+		model.Prompt{Content: "go"},
+		false,
+		func() time.Time {
+			now = now.Add(time.Second)
+			return now
+		},
+		false,
+	)
+	m.current = "go"
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated := gotModel.(typingSessionModel)
+	if !updated.isDone() {
+		t.Fatal("expected enter to commit and finish")
+	}
+	if cmd == nil {
+		t.Fatal("expected quit command on completion")
+	}
+}
+
+func TestUpdateEscAndCtrlCAbort(t *testing.T) {
+	for _, key := range []tea.KeyType{tea.KeyEsc, tea.KeyCtrlC} {
+		t.Run(key.String(), func(t *testing.T) {
+			m := newTypingSessionModel(
+					model.Prompt{Content: helloWorldPrompt},
+				false,
+				func() time.Time { return time.Unix(123, 0) },
+				false,
+			)
+			gotModel, cmd := m.Update(tea.KeyMsg{Type: key})
+			updated := gotModel.(typingSessionModel)
+			if !updated.aborted {
+				t.Fatal("expected aborted flag to be set")
+			}
+			if updated.endedAt.IsZero() {
+				t.Fatal("expected endedAt to be recorded")
+			}
+			if cmd == nil {
+				t.Fatal("expected quit command")
+			}
+		})
+	}
+}
+
+func TestRemoveLastRune(t *testing.T) {
+	if got := removeLastRune(""); got != "" {
+		t.Fatalf("empty input: got %q", got)
+	}
+	if got := removeLastRune("abc"); got != "ab" {
+		t.Fatalf("ascii input: got %q", got)
+	}
+	if got := removeLastRune("hé"); got != "h" {
+		t.Fatalf("unicode input: got %q", got)
 	}
 }
