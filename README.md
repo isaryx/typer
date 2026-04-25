@@ -36,9 +36,18 @@ go run ./cmd/typer stats --last 20
 ```
 
 ```bash
+go run ./cmd/typer version
+```
+
+```bash
 typer set --words-file ./path-to-words.txt
 typer set --passages-file ./path-to-passages.txt
 typer set --words-file ./words.txt --passages-file ./passages.txt
+```
+
+```bash
+typer --reset-progress
+# at the prompt, type y (or yes) to clear saved history
 ```
 
 ## Build
@@ -56,6 +65,19 @@ GOOS=linux GOARCH=amd64 go build -o dist/typer-linux-amd64 ./cmd/typer
 GOOS=darwin GOARCH=arm64 go build -o dist/typer-darwin-arm64 ./cmd/typer
 GOOS=windows GOARCH=amd64 go build -o dist/typer-windows-amd64.exe ./cmd/typer
 ```
+
+Embed version when building manually:
+
+```bash
+go build -ldflags "-X typer/internal/version.Version=0.01" -o typer ./cmd/typer
+```
+
+## Install
+
+Download the latest archive from this repository's GitHub Releases page, then extract and place the binary on your `PATH`.
+
+- macOS/Linux: extract `.tar.gz` and move `typer` to somewhere like `/usr/local/bin`.
+- Windows: extract `.zip` and add the folder containing `typer.exe` to `PATH`.
 
 ## Open-source libraries
 

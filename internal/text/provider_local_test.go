@@ -58,3 +58,17 @@ func TestNewLocalProvider_MissingFile(t *testing.T) {
 		t.Fatalf("expected error for missing file")
 	}
 }
+
+func TestLoadCorpus_RejectsOversizedFile(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "huge.txt")
+	big := make([]byte, maxCorpusBytes+1)
+	for i := range big {
+		big[i] = 'a'
+	}
+	if err := os.WriteFile(tmp, big, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, _, err := loadCorpusOrBuiltin(tmp, "", ""); err == nil {
+		t.Fatalf("expected oversize corpus error, got nil")
+	}
+}

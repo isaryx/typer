@@ -20,12 +20,16 @@ type QuoteCacheStore struct {
 	path string
 }
 
+const quotesCacheFilename = "quotes_cache.json"
+
 func NewQuoteCacheStore() (*QuoteCacheStore, error) {
-	cfg, err := appConfigDir()
+	cacheDir, err := appCacheDir()
 	if err != nil {
 		return nil, err
 	}
-	return NewQuoteCacheStoreAt(filepath.Join(cfg, "quotes_cache.json")), nil
+	newPath := filepath.Join(cacheDir, quotesCacheFilename)
+
+	return NewQuoteCacheStoreAt(newPath), nil
 }
 
 func NewQuoteCacheStoreAt(path string) *QuoteCacheStore {

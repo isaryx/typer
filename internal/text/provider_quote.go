@@ -20,6 +20,15 @@ import (
 const typeFitURL = "https://type.fit/api/quotes"
 const defaultRemoteQuoteLimit = 250
 
+// maxRemoteBodyBytes caps the response body from the third-party quote API so a
+// hostile or compromised upstream cannot exhaust memory before we parse.
+const maxRemoteBodyBytes = 2 << 20 // 2 MiB
+
+// maxQuoteRuneLen bounds each cached quote/author field. The typing UI is not
+// designed for arbitrary-length strings, and this also limits blast radius of a
+// poisoned upstream.
+const maxQuoteRuneLen = 1024
+
 type QuoteProvider struct {
 	cache    *storage.QuoteCacheStore
 	http     *http.Client
@@ -65,10 +74,14 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 		return model.Prompt{}, errors.New("no quotes available")
 	}
 	q := quotes[rand.IntN(len(quotes))]
+	content := sanitizeQuoteField(q.Content, maxQuoteRuneLen)
+	if content == "" {
+		return model.Prompt{}, errors.New("no quotes available")
+	}
 	return model.Prompt{
 		ID:      time.Now().UTC().Format(time.RFC3339Nano),
-		Content: q.Content,
-		Author:  q.Author,
+		Content: content,
+		Author:  sanitizeQuoteField(q.Author, maxQuoteRuneLen),
 		Source:  q.Source,
 		Mode:    model.ModeQuote,
 	}, nil
@@ -117,7 +130,7 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, fmt.Errorf("remote quote API returned status %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRemoteBodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +144,7 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 	quotes := make([]storage.CachedQuote, 0, len(payload))
 	seen := map[string]struct{}{}
 	for _, item := range payload {
-		content := strings.TrimSpace(item.Text)
+		content := sanitizeQuoteField(item.Text, maxQuoteRuneLen)
 		if content == "" {
 			continue
 		}
@@ -141,7 +154,7 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 		seen[content] = struct{}{}
 		quotes = append(quotes, storage.CachedQuote{
 			Content: content,
-			Author:  strings.TrimSpace(item.Author),
+			Author:  sanitizeQuoteField(item.Author, maxQuoteRuneLen),
 			Source:  "type.fit",
 		})
 		if len(quotes) >= defaultRemoteQuoteLimit {
@@ -163,4 +176,32 @@ func (p *QuoteProvider) seedQuotes() ([]storage.CachedQuote, error) {
 		return nil, err
 	}
 	return quotes, nil
+}
+
+// sanitizeQuoteField strips ASCII/C1 control characters (keeping \t) from
+// untrusted third-party strings before they are cached or rendered to the
+// terminal, then trims surrounding whitespace and truncates to maxRunes runes.
+// This prevents a compromised or poisoned upstream from injecting ANSI/OSC
+// escape sequences into the typing UI.
+func sanitizeQuoteField(s string, maxRunes int) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\t' {
+			return r
+		}
+		if r < 0x20 || r == 0x7F {
+			return -1
+		}
+		if r >= 0x80 && r < 0xA0 {
+			return -1
+		}
+		return r
+	}, s)
+	cleaned = strings.TrimSpace(cleaned)
+	if maxRunes > 0 {
+		runes := []rune(cleaned)
+		if len(runes) > maxRunes {
+			cleaned = string(runes[:maxRunes])
+		}
+	}
+	return cleaned
 }

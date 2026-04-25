@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (without v prefix)"
+        required: true
+        default: "0.0.1"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            archive: zip
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          # Normalize common input/tag mistakes:
+          # - v0.0.1 or V0.0.1 -> 0.0.1
+          # - .0.0.1 -> 0.0.1
+          VERSION="${VERSION#v}"
+          VERSION="${VERSION#V}"
+          VERSION="${VERSION#.}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          BIN_NAME="typer-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          OUT_NAME="${BIN_NAME}${{ matrix.ext }}"
+          go build -trimpath -ldflags "-s -w -X typer/internal/version.Version=${VERSION}" -o "dist/${OUT_NAME}" ./cmd/typer
+
+      - name: Package archive
+        run: |
+          BIN_NAME="typer-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          OUT_NAME="${BIN_NAME}${{ matrix.ext }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd dist && zip -q "${BIN_NAME}.zip" "${OUT_NAME}")
+          else
+            (cd dist && tar -czf "${BIN_NAME}.tar.gz" "${OUT_NAME}")
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+
+  release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Generate checksums
+        run: |
+          shopt -s globstar
+          cd dist
+          sha256sum **/*.tar.gz **/*.zip > checksums.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**/*.tar.gz
+            dist/**/*.zip
+            dist/checksums.txt

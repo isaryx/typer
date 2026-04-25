@@ -7,11 +7,18 @@ import (
 	"path/filepath"
 )
 
+// Config files can contain typed text echoed from sessions; keep them private
+// to the current user (0700 dirs, 0600 files).
+const (
+	configDirPerm  os.FileMode = 0o700
+	configFilePerm os.FileMode = 0o600
+)
+
 // readJSONFile reads the JSON file at path into v.
 // Returns (exists=false, nil) when the file is missing or empty, so callers
 // can initialize default state without treating it as an error.
 func readJSONFile(path string, v any) (exists bool, err error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), configDirPerm); err != nil {
 		return false, err
 	}
 	data, err := os.ReadFile(path)
@@ -33,7 +40,7 @@ func readJSONFile(path string, v any) (exists bool, err error) {
 // writeJSONFileAtomic marshals v with 2-space indent and writes to path via
 // a tmp-file+rename so readers never see a half-written document.
 func writeJSONFileAtomic(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), configDirPerm); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(v, "", "  ")
@@ -41,8 +48,15 @@ func writeJSONFileAtomic(path string, v any) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, configFilePerm); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	// Rename preserves the tmp file's mode, but if path pre-existed with wider
+	// perms we want to tighten it. Ignore errors on platforms (e.g. Windows)
+	// where chmod semantics differ.
+	_ = os.Chmod(path, configFilePerm)
+	return nil
 }
