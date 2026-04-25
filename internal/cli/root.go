@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"typer/internal/analytics"
 	"typer/internal/model"
@@ -335,29 +334,37 @@ func printOneSessionResult(out io.Writer, r model.SessionResult) {
 
 func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "  · "+heading)
-	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	printRow := func(label, value string) {
-		_, _ = fmt.Fprintln(tw, "  "+label+"\t"+value)
-	}
+	const (
+		boxTopFmt      = "  ╭%s╮\n"
+		boxBottomFmt   = "  ╰%s╯\n"
+		boxInnerWidth  = 60
+		boxPaddingCols = 2
+		twoColumnFmt   = "%-16s %-10s  %-14s %s"
+	)
+	boxInnerFmt := fmt.Sprintf("  │ %%-%ds │\n", boxInnerWidth)
+	horizontalBar := strings.Repeat("─", boxInnerWidth+boxPaddingCols)
 	if summary {
-		printRow("Avg gross WPM", fmt.Sprintf("%.2f", gross))
-		printRow("Avg net WPM", fmt.Sprintf("%.2f", net))
-		printRow("Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted))
-		printRow("Avg accuracy", fmt.Sprintf("%.2f%%", acc))
-		printRow("Avg consistency", fmt.Sprintf("%.2f", cons))
-		printRow("Total errors", fmt.Sprintf("%d", errCount))
-		printRow("Total time", formatElapsedMS(elapsedMS))
+		fmt.Fprintf(out, boxTopFmt, horizontalBar)
+		fmt.Fprintf(out, boxInnerFmt, heading)
+		fmt.Fprintf(out, boxInnerFmt, "")
+		fmt.Fprintf(out, boxInnerFmt, "SPEED                               CONTROL")
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg gross WPM", fmt.Sprintf("%.2f", gross), "Avg accuracy", fmt.Sprintf("%.2f%%", acc)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg net WPM", fmt.Sprintf("%.2f", net), "Avg consistency", fmt.Sprintf("%.2f", cons)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Total errors", fmt.Sprintf("%d", errCount)))
+		fmt.Fprintf(out, boxInnerFmt, "")
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Total time: %s", formatElapsedMS(elapsedMS)))
+		fmt.Fprintf(out, boxBottomFmt, horizontalBar)
 	} else {
-		printRow("Gross WPM", fmt.Sprintf("%.2f", gross))
-		printRow("Net WPM", fmt.Sprintf("%.2f", net))
-		printRow("Adjusted WPM", fmt.Sprintf("%.2f", adjusted))
-		printRow("Accuracy", fmt.Sprintf("%.2f%%", acc))
-		printRow("Consistency", fmt.Sprintf("%.2f", cons))
-		printRow("Errors", fmt.Sprintf("%d", errCount))
-		printRow("Time", formatElapsedMS(elapsedMS))
+		fmt.Fprintf(out, boxTopFmt, horizontalBar)
+		fmt.Fprintf(out, boxInnerFmt, "")
+		fmt.Fprintf(out, boxInnerFmt, "SPEED                               CONTROL")
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Gross WPM", fmt.Sprintf("%.2f", gross), "Accuracy", fmt.Sprintf("%.2f%%", acc)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Net WPM", fmt.Sprintf("%.2f", net), "Consistency", fmt.Sprintf("%.2f", cons)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Errors", fmt.Sprintf("%d", errCount)))
+		fmt.Fprintf(out, boxInnerFmt, "")
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Duration: %s", formatElapsedMS(elapsedMS)))
+		fmt.Fprintf(out, boxBottomFmt, horizontalBar)
 	}
-	_ = tw.Flush()
 	fmt.Fprintln(out)
 }
 
