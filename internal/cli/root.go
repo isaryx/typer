@@ -109,15 +109,14 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	fs := flag.NewFlagSet("start", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	// Use separate vars so -m and --mode defaults cannot clobber each other (flag quirk when sharing one pointer).
-	var modeLong, modeShort string
-	fs.StringVar(&modeLong, "mode", "passages", "Text mode: passages|p, words|w, or quotes|q.")
-	fs.StringVar(&modeShort, "m", "", "Shorthand for --mode (same values as --mode).")
+	var mode string
+	fs.StringVar(&mode, "mode", "passages", "Text mode: passages|p, words|w, or quotes|q.")
+	fs.StringVar(&mode, "m", "passages", "Shorthand for --mode (same values as --mode).")
 	var words int
 	fs.IntVar(&words, "words", 15, "Number of words per prompt (words mode only).")
 	fs.IntVar(&words, "w", 15, "Shorthand for --words.")
-	duration := fs.Int("duration", 0, "Unused; reserved for future timed sessions.")
-	source := fs.String("source", "remote", "Quotes mode fetch policy: auto|remote|cache|seed.")
+	var source string
+	fs.StringVar(&source, "source", "remote", "Quotes mode fetch policy: auto|remote|cache|seed.")
 
 	rest, strict, indefinite, err := extractPresenceFlags(args)
 	if err != nil {
@@ -131,9 +130,19 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		return err
 	}
 
-	mode := strings.TrimSpace(modeLong)
-	if strings.TrimSpace(modeShort) != "" {
-		mode = strings.TrimSpace(modeShort)
+	canonMode, err := text.CanonicalMode(strings.TrimSpace(mode))
+	if err != nil {
+		return err
+	}
+
+	sourceProvided := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "source" {
+			sourceProvided = true
+		}
+	})
+	if sourceProvided && canonMode != model.ModeQuote {
+		return fmt.Errorf("--source is only valid with --mode quotes")
 	}
 
 	cache, err := storage.NewQuoteCacheStore()
@@ -145,10 +154,6 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		return err
 	}
 	settings, err := settingsStore.Load()
-	if err != nil {
-		return err
-	}
-	canonMode, err := text.CanonicalMode(mode)
 	if err != nil {
 		return err
 	}
@@ -164,12 +169,11 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	}
 
 	opts := model.SessionOptions{
-		Mode:            canonMode,
-		Words:           words,
-		DurationSeconds: *duration,
-		Source:          *source,
-		Strict:          strict,
-		Indefinite:      indefinite,
+		Mode:       canonMode,
+		Words:      words,
+		Source:     source,
+		Strict:     strict,
+		Indefinite: indefinite,
 	}
 
 	var results []model.SessionResult
@@ -307,7 +311,10 @@ func runSet(args []string, stdout io.Writer) error {
 		}
 		return err
 	}
-	if strings.TrimSpace(*wordsFile) == "" && strings.TrimSpace(*passagesFile) == "" {
+
+	wf := strings.TrimSpace(*wordsFile)
+	pf := strings.TrimSpace(*passagesFile)
+	if wf == "" && pf == "" {
 		return errors.New("set requires --words-file and/or --passages-file")
 	}
 
@@ -335,15 +342,15 @@ func runSet(args []string, stdout io.Writer) error {
 		return err
 	}
 
-	if strings.TrimSpace(*wordsFile) != "" {
-		absPath, err := validateFile("words file", *wordsFile)
+	if wf != "" {
+		absPath, err := validateFile("words file", wf)
 		if err != nil {
 			return err
 		}
 		settings.WordsFile = absPath
 	}
-	if strings.TrimSpace(*passagesFile) != "" {
-		absPath, err := validateFile("passages file", *passagesFile)
+	if pf != "" {
+		absPath, err := validateFile("passages file", pf)
 		if err != nil {
 			return err
 		}
@@ -354,10 +361,10 @@ func runSet(args []string, stdout io.Writer) error {
 		return err
 	}
 
-	if strings.TrimSpace(*wordsFile) != "" {
+	if wf != "" {
 		fmt.Fprintf(stdout, "Custom words file set to %s\n", settings.WordsFile)
 	}
-	if strings.TrimSpace(*passagesFile) != "" {
+	if pf != "" {
 		fmt.Fprintf(stdout, "Custom passages file set to %s\n", settings.PassagesFile)
 	}
 	return nil
@@ -470,7 +477,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Quick reference:")
-	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC] [--duration N]")
+	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
@@ -486,7 +493,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "Run an interactive typing session.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC] [--duration N]")
+	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
@@ -494,7 +501,6 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "  -m, --mode string    Text mode: passages|p, words|w, or quotes|q (default passages).")
 	fmt.Fprintln(out, "  -w, --words int      Words per prompt in words mode (default 15).")
 	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default remote).")
-	fmt.Fprintln(out, "      --duration int   Reserved for future use (default 0).")
 	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
 }
@@ -529,5 +535,3 @@ func printStatsHelp(out io.Writer) {
 	fmt.Fprintln(out, "Options:")
 	fmt.Fprintln(out, "      --last int   Maximum sessions to analyze (default 20).")
 }
-
-var ErrInvalidCommand = errors.New("invalid command")

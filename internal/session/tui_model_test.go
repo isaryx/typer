@@ -9,7 +9,7 @@ import (
 )
 
 func TestCommitCurrentWord_StrictMismatchBlocksAdvance(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
@@ -27,7 +27,7 @@ func TestCommitCurrentWord_StrictMismatchBlocksAdvance(t *testing.T) {
 }
 
 func TestAppendRunes_StrictRejectsWrongActiveChar(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
@@ -51,7 +51,7 @@ func TestAppendRunes_StrictRejectsWrongActiveChar(t *testing.T) {
 
 func TestCommitCurrentWord_NonStrictAdvancesAndClearsPrompt(t *testing.T) {
 	now := time.Unix(100, 0)
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		false,
 		func() time.Time {
@@ -75,7 +75,7 @@ func TestCommitCurrentWord_NonStrictAdvancesAndClearsPrompt(t *testing.T) {
 }
 
 func TestCommitCurrentWord_StrictMatchAdvancesAndClearsPrompt(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
@@ -93,7 +93,7 @@ func TestCommitCurrentWord_StrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 }
 
 func TestAppendRunes_TracksKeystrokeAccuracy(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
@@ -112,7 +112,7 @@ func TestAppendRunes_TracksKeystrokeAccuracy(t *testing.T) {
 }
 
 func TestCommitCurrentWord_TracksUncorrectedErrors(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello world"},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
@@ -129,7 +129,7 @@ func TestCommitCurrentWord_TracksUncorrectedErrors(t *testing.T) {
 func TestRenderWords_WrapsToTerminalWidth(t *testing.T) {
 	// Many one-letter "words"; each styled segment is wider than a bare rune but still tiny.
 	content := strings.TrimSpace(strings.Repeat("x ", 60))
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: content},
 		true,
 		func() time.Time { return time.Unix(100, 0) },
@@ -143,7 +143,7 @@ func TestRenderWords_WrapsToTerminalWidth(t *testing.T) {
 }
 
 func TestWrapWidth_capsWideTerminal(t *testing.T) {
-	m := newWordSessionModel(
+	m := newTypingSessionModel(
 		model.Prompt{Content: "hello"},
 		false,
 		func() time.Time { return time.Unix(100, 0) },

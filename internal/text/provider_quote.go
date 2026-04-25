@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"log"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ const defaultRemoteQuoteLimit = 250
 
 type QuoteProvider struct {
 	cache    *storage.QuoteCacheStore
-	rng      *rand.Rand
 	http     *http.Client
 	endpoint string
 }
@@ -29,7 +29,6 @@ type QuoteProvider struct {
 func NewQuoteProvider(cache *storage.QuoteCacheStore) *QuoteProvider {
 	return &QuoteProvider{
 		cache:    cache,
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
 		endpoint: typeFitURL,
 		http: &http.Client{
 			Timeout: 4 * time.Second,
@@ -65,13 +64,13 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 	if len(quotes) == 0 {
 		return model.Prompt{}, errors.New("no quotes available")
 	}
-	q := quotes[p.rng.Intn(len(quotes))]
+	q := quotes[rand.IntN(len(quotes))]
 	return model.Prompt{
 		ID:      time.Now().UTC().Format(time.RFC3339Nano),
 		Content: q.Content,
 		Author:  q.Author,
 		Source:  q.Source,
-		Mode:    "quote",
+		Mode:    model.ModeQuote,
 	}, nil
 }
 
@@ -152,7 +151,9 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 	if len(quotes) == 0 {
 		return nil, errors.New("remote quote API returned empty payload")
 	}
-	_ = p.cache.Save(quotes)
+	if err := p.cache.Save(quotes); err != nil {
+		log.Printf("typer: failed to save quote cache: %v", err)
+	}
 	return quotes, nil
 }
 

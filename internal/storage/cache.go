@@ -1,9 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
 	"path/filepath"
 	"time"
 )
@@ -32,40 +29,20 @@ func NewQuoteCacheStore() (*QuoteCacheStore, error) {
 }
 
 func NewQuoteCacheStoreAt(path string) *QuoteCacheStore {
-	return &QuoteCacheStore{
-		path: path,
-	}
+	return &QuoteCacheStore{path: path}
 }
 
 func (s *QuoteCacheStore) Load() (QuoteCacheFile, error) {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return QuoteCacheFile{}, err
-	}
-	data, err := os.ReadFile(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return QuoteCacheFile{Quotes: []CachedQuote{}}, nil
-	}
-	if err != nil {
-		return QuoteCacheFile{}, err
-	}
-	if len(data) == 0 {
-		return QuoteCacheFile{Quotes: []CachedQuote{}}, nil
-	}
-	var out QuoteCacheFile
-	if err := json.Unmarshal(data, &out); err != nil {
+	out := QuoteCacheFile{Quotes: []CachedQuote{}}
+	if _, err := readJSONFile(s.path, &out); err != nil {
 		return QuoteCacheFile{}, err
 	}
 	return out, nil
 }
 
 func (s *QuoteCacheStore) Save(quotes []CachedQuote) error {
-	payload := QuoteCacheFile{
+	return writeJSONFileAtomic(s.path, QuoteCacheFile{
 		FetchedAt: time.Now().UTC(),
 		Quotes:    quotes,
-	}
-	data, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(s.path, data, 0o644)
+	})
 }

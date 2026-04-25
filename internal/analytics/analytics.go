@@ -49,10 +49,10 @@ func BuildSummary(sessions []model.SessionResult, topN int) Summary {
 	}
 
 	n := float64(len(sessions))
-	out.AvgGrossWPM = scoringRound2(out.AvgGrossWPM / n)
-	out.AvgNetWPM = scoringRound2(out.AvgNetWPM / n)
-	out.AvgAccuracy = scoringRound2(out.AvgAccuracy / n)
-	out.AvgErrors = scoringRound2(out.AvgErrors / n)
+	out.AvgGrossWPM = scoring.Round2(out.AvgGrossWPM / n)
+	out.AvgNetWPM = scoring.Round2(out.AvgNetWPM / n)
+	out.AvgAccuracy = scoring.Round2(out.AvgAccuracy / n)
+	out.AvgErrors = scoring.Round2(out.AvgErrors / n)
 	out.ConsistencyTrend = scoring.ConsistencyFromSamples(netSamples)
 	out.TopErrorChars = topCounts(errorMap, topN)
 	out.TopMissingChars = topCounts(missingMap, topN)
@@ -107,15 +107,4 @@ func topCounts(src map[string]int, n int) []CharCount {
 		items = items[:n]
 	}
 	return items
-}
-
-func scoringRound2(v float64) float64 {
-	return float64(int(v*100+0.5)) / 100
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

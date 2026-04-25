@@ -28,10 +28,6 @@ go run ./cmd/typer start --mode quotes
 ```
 
 ```bash
-go run ./cmd/typer start --mode quotes
-```
-
-```bash
 go run ./cmd/typer history --last 20
 ```
 

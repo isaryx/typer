@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,7 +19,6 @@ func NewHistoryStore() (*HistoryStore, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &HistoryStore{
 		path: filepath.Join(cfg, "history.json"),
 	}, nil
@@ -33,7 +30,8 @@ func (s *HistoryStore) Append(result model.SessionResult) error {
 		return err
 	}
 	h.Sessions = append(h.Sessions, result)
-	return s.write(h)
+	h.Version = historyVersion
+	return writeJSONFileAtomic(s.path, h)
 }
 
 func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {
@@ -41,50 +39,24 @@ func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if last <= 0 || last >= len(h.Sessions) {
-		out := slices.Clone(h.Sessions)
-		slices.Reverse(out)
-		return out, nil
+	start := 0
+	if last > 0 && last < len(h.Sessions) {
+		start = len(h.Sessions) - last
 	}
-	start := len(h.Sessions) - last
 	out := slices.Clone(h.Sessions[start:])
 	slices.Reverse(out)
 	return out, nil
 }
 
 func (s *HistoryStore) read() (model.HistoryFile, error) {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return model.HistoryFile{}, err
-	}
-
-	data, err := os.ReadFile(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}, nil
-	}
-	if err != nil {
-		return model.HistoryFile{}, err
-	}
-	if len(data) == 0 {
-		return model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}, nil
-	}
-
-	var h model.HistoryFile
-	if err := json.Unmarshal(data, &h); err != nil {
+	h := model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}
+	if _, err := readJSONFile(s.path, &h); err != nil {
 		return model.HistoryFile{}, err
 	}
 	if h.Version == 0 {
 		h.Version = historyVersion
 	}
 	return h, nil
-}
-
-func (s *HistoryStore) write(h model.HistoryFile) error {
-	h.Version = historyVersion
-	data, err := json.MarshalIndent(h, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(s.path, data, 0o644)
 }
 
 func appConfigDir() (string, error) {

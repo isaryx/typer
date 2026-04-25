@@ -3,9 +3,7 @@ package text
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -16,44 +14,27 @@ import (
 const defaultWordCount = 15
 
 type WordsProvider struct {
-	rng      *rand.Rand
 	words    []string
 	sourceID string
 }
 
 func NewWordsProvider(wordsFile string) (*WordsProvider, error) {
-	rawWords := assets.Words
-	sourceID := "builtin:assets/words.txt"
-	if strings.TrimSpace(wordsFile) != "" {
-		path, err := filepath.Abs(wordsFile)
-		if err != nil {
-			return nil, fmt.Errorf("resolve words file path: %w", err)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read words file %q: %w", path, err)
-		}
-		rawWords = string(data)
-		sourceID = "file:" + path
+	rawWords, sourceID, err := loadCorpusOrBuiltin(wordsFile, assets.Words, "assets/words.txt")
+	if err != nil {
+		return nil, err
 	}
 
 	lines := strings.Split(rawWords, "\n")
 	words := make([]string, 0, len(lines))
 	for _, l := range lines {
-		w := strings.TrimSpace(l)
-		if w != "" {
+		if w := strings.TrimSpace(l); w != "" {
 			words = append(words, w)
 		}
 	}
 	if len(words) == 0 {
 		return nil, fmt.Errorf("word list is empty")
 	}
-
-	return &WordsProvider{
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		words:    words,
-		sourceID: sourceID,
-	}, nil
+	return &WordsProvider{words: words, sourceID: sourceID}, nil
 }
 
 func (p *WordsProvider) Name() string {
@@ -70,12 +51,12 @@ func (p *WordsProvider) Next(_ context.Context, c Constraints) (model.Prompt, er
 		if i > 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(p.words[p.rng.Intn(len(p.words))])
+		b.WriteString(p.words[rand.IntN(len(p.words))])
 	}
 	return model.Prompt{
 		ID:      time.Now().UTC().Format(time.RFC3339Nano),
 		Content: b.String(),
 		Source:  p.Name(),
-		Mode:    "words",
+		Mode:    model.ModeWords,
 	}, nil
 }

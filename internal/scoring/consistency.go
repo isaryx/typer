@@ -33,5 +33,5 @@ func ConsistencyFromSamples(wpmSamples []float64) float64 {
 	if score > 100 {
 		return 100
 	}
-	return round2(score)
+	return Round2(score)
 }

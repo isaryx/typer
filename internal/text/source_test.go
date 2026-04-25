@@ -39,13 +39,14 @@ func TestCanonicalMode(t *testing.T) {
 	}
 }
 
-func TestNewProvider_modeAliases(t *testing.T) {
-	_, err := NewProvider("p", nil, "", "")
-	if err != nil {
-		t.Fatalf("NewProvider(p): %v", err)
+func TestNewProvider_canonicalModes(t *testing.T) {
+	if _, err := NewProvider("passage", nil, "", ""); err != nil {
+		t.Fatalf("NewProvider(passage): %v", err)
 	}
-	_, err = NewProvider("w", nil, "", "")
-	if err != nil {
-		t.Fatalf("NewProvider(w): %v", err)
+	if _, err := NewProvider("words", nil, "", ""); err != nil {
+		t.Fatalf("NewProvider(words): %v", err)
+	}
+	if _, err := NewProvider("p", nil, "", ""); err == nil {
+		t.Fatalf("NewProvider(p) expected error: shorthands must be canonicalized first")
 	}
 }

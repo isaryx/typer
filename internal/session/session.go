@@ -31,7 +31,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		return model.SessionResult{}, err
 	}
 
-	tuiResult, err := runWordSession(input, output, prompt, opts.Strict, opts.Indefinite, r.Now)
+	tuiResult, err := runTypingSession(input, output, prompt, opts.Strict, opts.Indefinite, r.Now)
 	if err != nil {
 		return model.SessionResult{}, err
 	}

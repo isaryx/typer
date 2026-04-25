@@ -5,18 +5,20 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"typer/internal/model"
+	"typer/internal/scoring"
 )
 
 // maxWrapWidth caps soft-wrap and lipgloss layout on wide terminals so lines stay
 // readable (roughly 65–95 characters is a common prose band; 88 matches e.g. rustfmt).
 const maxWrapWidth = 88
 
-type wordSessionResult struct {
+type typingSessionResult struct {
 	TypedText         string
 	StartedAt         time.Time
 	EndedAt           time.Time
@@ -30,7 +32,7 @@ type wordSessionResult struct {
 	UncorrectedErrors int
 }
 
-type wordSessionModel struct {
+type typingSessionModel struct {
 	prompt            model.Prompt
 	words             []string
 	typedWords        []string
@@ -49,33 +51,40 @@ type wordSessionModel struct {
 	totalKeystrokes   int
 	correctKeystrokes int
 	uncorrectedErrors int
+	// typedCharCount is the rune count of typedWords joined with single spaces.
+	// Maintained incrementally so appendWPMSample is O(1) per call.
+	typedCharCount int
 	// width is terminal width in cells (from WindowSizeMsg). Used to soft-wrap long prompts.
 	width int
 	// indefinite shows a hint that Ctrl+C ends the run with a summary (CLI indefinite mode).
 	indefinite bool
 }
 
-func newWordSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool) wordSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool) typingSessionModel {
 	if now == nil {
 		now = time.Now
 	}
 	words := strings.Fields(prompt.Content)
-	return wordSessionModel{
-		prompt:     prompt,
-		words:      words,
-		strict:     strict,
-		now:        now,
-		startedAt:  now().UTC(),
-		styles:     defaultStyles(),
-		indefinite: indefinite,
+	n := len(words)
+	return typingSessionModel{
+		prompt:      prompt,
+		words:       words,
+		typedWords:  make([]string, 0, n),
+		wordMatches: make([]bool, 0, n),
+		wpmSamples:  make([]float64, 0, n),
+		strict:      strict,
+		now:         now,
+		startedAt:   now().UTC(),
+		styles:      defaultStyles(),
+		indefinite:  indefinite,
 	}
 }
 
-func (m wordSessionModel) Init() tea.Cmd {
+func (m typingSessionModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m wordSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -84,14 +93,16 @@ func (m wordSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
-		if m.isDone() {
-			return m, tea.Quit
-		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.aborted = true
 			m.endedAt = m.now().UTC()
 			return m, tea.Quit
+		}
+		if m.isDone() {
+			return m, tea.Quit
+		}
+		switch msg.Type {
 		case tea.KeyBackspace:
 			m.current = removeLastRune(m.current)
 			m.status = ""
@@ -113,7 +124,7 @@ func (m wordSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m wordSessionModel) View() string {
+func (m typingSessionModel) View() string {
 	if len(m.words) == 0 {
 		return "No text available for this session.\n"
 	}
@@ -151,7 +162,7 @@ func (m wordSessionModel) View() string {
 	return b.String()
 }
 
-func (m wordSessionModel) termWidth() int {
+func (m typingSessionModel) termWidth() int {
 	if m.width > 0 {
 		return m.width
 	}
@@ -159,7 +170,7 @@ func (m wordSessionModel) termWidth() int {
 }
 
 // wrapWidth is min(terminal width, maxWrapWidth) so content does not stretch across ultra-wide screens.
-func (m wordSessionModel) wrapWidth() int {
+func (m typingSessionModel) wrapWidth() int {
 	tw := m.termWidth()
 	if tw > maxWrapWidth {
 		return maxWrapWidth
@@ -168,7 +179,7 @@ func (m wordSessionModel) wrapWidth() int {
 }
 
 // promptInnerWidth is the line width for text inside the bordered prompt (account for left+right border runes).
-func (m wordSessionModel) promptInnerWidth() int {
+func (m typingSessionModel) promptInnerWidth() int {
 	w := m.wrapWidth() - 2
 	if w < 1 {
 		return 1
@@ -176,7 +187,7 @@ func (m wordSessionModel) promptInnerWidth() int {
 	return w
 }
 
-func (m wordSessionModel) renderWordPiece(i int, w string) string {
+func (m typingSessionModel) renderWordPiece(i int, w string) string {
 	switch {
 	case i < m.wordIndex:
 		if i < len(m.wordMatches) && !m.wordMatches[i] {
@@ -190,7 +201,7 @@ func (m wordSessionModel) renderWordPiece(i int, w string) string {
 	}
 }
 
-func (m wordSessionModel) renderWords(lineWidth int) string {
+func (m typingSessionModel) renderWords(lineWidth int) string {
 	if lineWidth < 1 {
 		lineWidth = 1
 	}
@@ -223,16 +234,13 @@ func (m wordSessionModel) renderWords(lineWidth int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m wordSessionModel) renderActiveWord(target string) string {
+func (m typingSessionModel) renderActiveWord(target string) string {
 	targetRunes := []rune(target)
 	if len(targetRunes) == 0 {
 		return m.styles.active.Render(target)
 	}
 
-	cursor := len([]rune(strings.TrimSpace(m.current)))
-	if cursor < 0 {
-		cursor = 0
-	}
+	cursor := utf8.RuneCountInString(m.current)
 	if cursor >= len(targetRunes) {
 		return m.styles.active.Render(target)
 	}
@@ -248,29 +256,49 @@ func (m wordSessionModel) renderActiveWord(target string) string {
 	return b.String()
 }
 
-func (m wordSessionModel) renderInputWord() string {
+// renderInputWord groups consecutive good/bad runes into single styled runs so
+// each render emits one ANSI escape per run instead of per rune.
+func (m typingSessionModel) renderInputWord() string {
 	if m.wordIndex >= len(m.words) {
 		return m.styles.input.Render(m.current)
 	}
 	target := []rune(m.words[m.wordIndex])
 	typed := []rune(m.current)
+	if len(typed) == 0 {
+		return ""
+	}
+
 	var b strings.Builder
-	for i, ch := range typed {
-		if i < len(target) && ch != target[i] {
-			b.WriteString(m.styles.inputBad.Render(string(ch)))
+	runStart := 0
+	runBad := len(target) > 0 && typed[0] != target[0]
+	isBad := func(i int) bool {
+		return i < len(target) && typed[i] != target[i]
+	}
+	flush := func(end int) {
+		segment := string(typed[runStart:end])
+		if runBad {
+			b.WriteString(m.styles.inputBad.Render(segment))
 		} else {
-			b.WriteString(m.styles.input.Render(string(ch)))
+			b.WriteString(m.styles.input.Render(segment))
 		}
 	}
+	for i := 1; i < len(typed); i++ {
+		if bad := isBad(i); bad != runBad {
+			flush(i)
+			runStart = i
+			runBad = bad
+		}
+	}
+	flush(len(typed))
 	return b.String()
 }
 
-func (m *wordSessionModel) commitCurrentWord() {
+func (m *typingSessionModel) commitCurrentWord() {
 	if m.wordIndex >= len(m.words) {
 		return
 	}
 
-	currentInput := strings.TrimSpace(m.current)
+	currentInput := m.current
 	if currentInput == "" {
 		m.status = "Type the current word before advancing."
 		return
@@ -288,7 +316,13 @@ func (m *wordSessionModel) commitCurrentWord() {
 		m.status = ""
 	}
 
-	m.uncorrectedErrors += countRuneMismatches([]rune(targetWord), []rune(currentInput))
+	_, mismatches := scoring.CompareRunes([]rune(targetWord), []rune(currentInput))
+	m.uncorrectedErrors += mismatches
+
+	if m.wordIndex > 0 {
+		m.typedCharCount++ // joining space
+	}
+	m.typedCharCount += utf8.RuneCountInString(currentInput)
 
 	m.typedWords = append(m.typedWords, currentInput)
 	m.wordMatches = append(m.wordMatches, matched)
@@ -297,46 +331,25 @@ func (m *wordSessionModel) commitCurrentWord() {
 	m.appendWPMSample()
 }
 
-func countRuneMismatches(target, typed []rune) int {
-	n := len(target)
-	if len(typed) < n {
-		n = len(typed)
-	}
-	mismatches := 0
-	for i := 0; i < n; i++ {
-		if target[i] != typed[i] {
-			mismatches++
-		}
-	}
-	if len(typed) > len(target) {
-		mismatches += len(typed) - len(target)
-	}
-	if len(target) > len(typed) {
-		mismatches += len(target) - len(typed)
-	}
-	return mismatches
-}
-
-func (m *wordSessionModel) appendWPMSample() {
+func (m *typingSessionModel) appendWPMSample() {
 	elapsedMinutes := m.now().Sub(m.startedAt).Minutes()
 	if elapsedMinutes <= 0 {
 		return
 	}
-	charCount := len([]rune(strings.Join(m.typedWords, " ")))
-	gross := (float64(charCount) / 5.0) / elapsedMinutes
+	gross := (float64(m.typedCharCount) / 5.0) / elapsedMinutes
 	m.wpmSamples = append(m.wpmSamples, gross)
 }
 
-func (m wordSessionModel) isDone() bool {
+func (m typingSessionModel) isDone() bool {
 	return m.wordIndex >= len(m.words) && len(m.words) > 0
 }
 
-func (m wordSessionModel) result() wordSessionResult {
+func (m typingSessionModel) result() typingSessionResult {
 	ended := m.endedAt
 	if ended.IsZero() {
 		ended = m.now().UTC()
 	}
-	return wordSessionResult{
+	return typingSessionResult{
 		TypedText:         strings.Join(m.typedWords, " "),
 		StartedAt:         m.startedAt,
 		EndedAt:           ended,
@@ -351,10 +364,10 @@ func (m wordSessionModel) result() wordSessionResult {
 	}
 }
 
-func runWordSession(input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time) (wordSessionResult, error) {
-	m := newWordSessionModel(prompt, strict, now, indefinite)
+func runTypingSession(input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite)
 	if len(m.words) == 0 {
-		return wordSessionResult{}, fmt.Errorf("prompt contains no words")
+		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}
 
 	// Full clear + cursor home so each session (including indefinite rounds) starts uncluttered.
@@ -367,17 +380,17 @@ func runWordSession(input io.Reader, output io.Writer, prompt model.Prompt, stri
 	)
 	finalModel, err := p.Run()
 	if err != nil {
-		return wordSessionResult{}, err
+		return typingSessionResult{}, err
 	}
 
-	fm, ok := finalModel.(wordSessionModel)
+	fm, ok := finalModel.(typingSessionModel)
 	if !ok {
-		return wordSessionResult{}, fmt.Errorf("unexpected final session model")
+		return typingSessionResult{}, fmt.Errorf("unexpected final session model")
 	}
 	return fm.result(), nil
 }
 
-func (m *wordSessionModel) appendRunes(runes []rune) {
+func (m *typingSessionModel) appendRunes(runes []rune) {
 	if m.wordIndex >= len(m.words) {
 		return
 	}
@@ -387,18 +400,12 @@ func (m *wordSessionModel) appendRunes(runes []rune) {
 	for _, r := range runes {
 		pos := len(current)
 		m.totalKeystrokes++
-		expected := rune(0)
-		if pos < len(target) {
-			expected = target[pos]
-		}
-		matched := pos < len(target) && r == expected
+		matched := pos < len(target) && r == target[pos]
 		if matched {
 			m.correctKeystrokes++
 		}
-		if m.strict {
-			if !matched {
-				continue
-			}
+		if m.strict && !matched {
+			continue
 		}
 		current = append(current, r)
 	}
@@ -406,9 +413,9 @@ func (m *wordSessionModel) appendRunes(runes []rune) {
 }
 
 func removeLastRune(s string) string {
-	runes := []rune(s)
-	if len(runes) == 0 {
+	if s == "" {
 		return s
 	}
-	return string(runes[:len(runes)-1])
+	_, size := utf8.DecodeLastRuneInString(s)
+	return s[:len(s)-size]
 }

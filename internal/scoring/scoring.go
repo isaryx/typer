@@ -38,7 +38,7 @@ func Compute(target, typed string, elapsed time.Duration, ks Keystrokes) model.S
 
 	if total == 0 {
 		total = len(typedRunes)
-		correct, uncorrected = compareRunes([]rune(target), typedRunes)
+		correct, uncorrected = CompareRunes([]rune(target), typedRunes)
 	}
 
 	gross := (float64(total) / 5.0) / minutes
@@ -53,15 +53,18 @@ func Compute(target, typed string, elapsed time.Duration, ks Keystrokes) model.S
 	}
 
 	return model.SessionMetrics{
-		GrossWPM:    round2(gross),
-		NetWPM:      round2(net),
-		Accuracy:    round2(accuracy),
+		GrossWPM:    Round2(gross),
+		NetWPM:      Round2(net),
+		Accuracy:    Round2(accuracy),
 		Consistency: 0,
 		Errors:      uncorrected,
 	}
 }
 
-func compareRunes(target, typed []rune) (int, int) {
+// CompareRunes returns (correctCount, uncorrectedErrorCount) when comparing
+// typed runes to the target. Uncorrected errors include substitutions, extras,
+// and missing trailing runes.
+func CompareRunes(target, typed []rune) (int, int) {
 	n := min(len(target), len(typed))
 	correct := 0
 	for i := 0; i < n; i++ {
@@ -73,6 +76,7 @@ func compareRunes(target, typed []rune) (int, int) {
 	return correct, uncorrected
 }
 
-func round2(v float64) float64 {
+// Round2 rounds to two decimals (banker-agnostic, uses math.Round).
+func Round2(v float64) float64 {
 	return math.Round(v*100) / 100
 }

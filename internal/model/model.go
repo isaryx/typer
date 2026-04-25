@@ -2,6 +2,13 @@ package model
 
 import "time"
 
+// Canonical mode identifiers persisted in history and used by providers.
+const (
+	ModePassage = "passage"
+	ModeWords   = "words"
+	ModeQuote   = "quote"
+)
+
 type Prompt struct {
 	ID      string `json:"id"`
 	Content string `json:"content"`
@@ -11,12 +18,11 @@ type Prompt struct {
 }
 
 type SessionOptions struct {
-	Mode            string
-	Words           int
-	DurationSeconds int
-	Source          string
-	Strict          bool
-	Indefinite      bool
+	Mode       string
+	Words      int
+	Source     string
+	Strict     bool
+	Indefinite bool
 }
 
 type SessionMetrics struct {

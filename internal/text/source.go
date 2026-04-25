@@ -21,38 +21,33 @@ type Provider interface {
 }
 
 // CanonicalMode maps user input (including shorthands) to passage, words, or quote
-// (internal names used by providers and persisted sessions). It also accepts those
-// internal names so it is safe to call twice (CLI canonicalizes then NewProvider does).
+// (internal names used by providers and persisted sessions).
 func CanonicalMode(mode string) (string, error) {
-	s := strings.ToLower(strings.TrimSpace(mode))
-	switch s {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "passage", "passages", "p":
-		return "passage", nil
+		return model.ModePassage, nil
 	case "words", "w":
-		return "words", nil
+		return model.ModeWords, nil
 	case "quote", "quotes", "q":
-		return "quote", nil
+		return model.ModeQuote, nil
 	default:
 		return "", fmt.Errorf("unsupported mode %q (valid: passages|p, words|w, quotes|q)", mode)
 	}
 }
 
+// NewProvider expects a canonical mode (as returned by CanonicalMode).
 func NewProvider(mode string, cache *storage.QuoteCacheStore, wordsFile, passagesFile string) (Provider, error) {
-	m, err := CanonicalMode(mode)
-	if err != nil {
-		return nil, err
-	}
-	switch m {
-	case "passage":
+	switch mode {
+	case model.ModePassage:
 		return NewLocalProvider(passagesFile)
-	case "words":
+	case model.ModeWords:
 		return NewWordsProvider(wordsFile)
-	case "quote":
+	case model.ModeQuote:
 		if cache == nil {
 			return nil, errors.New("quotes mode requires cache store")
 		}
 		return NewQuoteProvider(cache), nil
 	default:
-		return nil, fmt.Errorf("unsupported mode %q (valid: passages|p, words|w, quotes|q)", m)
+		return nil, fmt.Errorf("unsupported mode %q (valid: passage, words, quote)", mode)
 	}
 }

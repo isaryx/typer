@@ -1,18 +1,21 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func TestExtractPresenceFlags(t *testing.T) {
 	tests := []struct {
-		name         string
-		args         []string
-		wantRest     []string
-		wantStrict   bool
-		wantIndef    bool
-		wantErr      bool
+		name       string
+		args       []string
+		wantRest   []string
+		wantStrict bool
+		wantIndef  bool
+		wantErr    bool
 	}{
 		{"empty", nil, nil, false, false, false},
 		{"no flags", []string{"--mode", "words"}, []string{"--mode", "words"}, false, false, false},
@@ -49,5 +52,74 @@ func TestExtractPresenceFlags(t *testing.T) {
 				t.Fatalf("rest = %#v, want %#v", gotRest, tt.wantRest)
 			}
 		})
+	}
+}
+
+func TestExecute_NoArgsPrintsHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if err := Execute(context.Background(), nil, &stdout, &stderr); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "typer") {
+		t.Fatalf("expected help output, got %q", stdout.String())
+	}
+}
+
+func TestExecute_HelpAliases(t *testing.T) {
+	for _, alias := range []string{"help", "--help", "-h"} {
+		var stdout, stderr bytes.Buffer
+		if err := Execute(context.Background(), []string{alias}, &stdout, &stderr); err != nil {
+			t.Fatalf("Execute %s: %v", alias, err)
+		}
+		if !strings.Contains(stdout.String(), "typer") {
+			t.Fatalf("%s: expected help output, got %q", alias, stdout.String())
+		}
+	}
+}
+
+func TestExecute_UnknownCommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := Execute(context.Background(), []string{"nope"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error for unknown command")
+	}
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("expected unknown-command error, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "typer") {
+		t.Fatalf("expected help printed to stderr, got %q", stderr.String())
+	}
+}
+
+func TestRunStart_UnknownMode(t *testing.T) {
+	var stdout bytes.Buffer
+	err := runStart(context.Background(), []string{"--mode", "nonsense"}, strings.NewReader(""), &stdout)
+	if err == nil {
+		t.Fatal("expected error for unknown mode")
+	}
+	if !strings.Contains(err.Error(), "unsupported mode") {
+		t.Fatalf("expected unsupported-mode error, got %v", err)
+	}
+}
+
+func TestRunStart_SourceRejectedForNonQuoteMode(t *testing.T) {
+	var stdout bytes.Buffer
+	err := runStart(context.Background(), []string{"--mode", "words", "--source", "cache"}, strings.NewReader(""), &stdout)
+	if err == nil {
+		t.Fatal("expected error when --source combined with words mode")
+	}
+	if !strings.Contains(err.Error(), "--source is only valid") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunStart_HelpShortCircuits(t *testing.T) {
+	var stdout bytes.Buffer
+	err := runStart(context.Background(), []string{"-h"}, strings.NewReader(""), &stdout)
+	if err != nil {
+		t.Fatalf("runStart -h: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Run an interactive typing session") {
+		t.Fatalf("expected start help, got %q", stdout.String())
 	}
 }
