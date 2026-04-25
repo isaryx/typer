@@ -228,3 +228,27 @@ func TestExecute_ResetProgressRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestPrintMetricsTable_IncludesAdjustedWPM(t *testing.T) {
+	var out bytes.Buffer
+	printMetricsTable(&out, "Session result", 72.0, 68.0, 64.0, 88.9, 91.2, 3, 27_000, false)
+	got := out.String()
+	if !strings.Contains(got, "Adjusted WPM") {
+		t.Fatalf("expected Adjusted WPM row, got %q", got)
+	}
+	if !strings.Contains(got, "64.00") {
+		t.Fatalf("expected adjusted value, got %q", got)
+	}
+}
+
+func TestPrintMetricsTable_SummaryIncludesAvgAdjustedWPM(t *testing.T) {
+	var out bytes.Buffer
+	printMetricsTable(&out, "Summary (2 completed sessions)", 72.0, 68.0, 64.0, 88.9, 91.2, 3, 27_000, true)
+	got := out.String()
+	if !strings.Contains(got, "Avg adjusted WPM") {
+		t.Fatalf("expected Avg adjusted WPM row, got %q", got)
+	}
+	if !strings.Contains(got, "64.00") {
+		t.Fatalf("expected avg adjusted value, got %q", got)
+	}
+}

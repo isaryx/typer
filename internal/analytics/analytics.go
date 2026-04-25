@@ -17,6 +17,7 @@ type Summary struct {
 	Sessions          int
 	AvgGrossWPM       float64
 	AvgNetWPM         float64
+	AvgAdjustedWPM    float64
 	AvgAccuracy       float64
 	AvgErrors         float64
 	ConsistencyTrend  float64
@@ -42,6 +43,7 @@ func BuildSummary(sessions []model.SessionResult, topN int) Summary {
 	for _, s := range sessions {
 		out.AvgGrossWPM += s.Metrics.GrossWPM
 		out.AvgNetWPM += s.Metrics.NetWPM
+		out.AvgAdjustedWPM += s.Metrics.AdjustedWPM
 		out.AvgAccuracy += s.Metrics.Accuracy
 		out.AvgErrors += float64(s.Metrics.Errors)
 		netSamples = append(netSamples, s.Metrics.NetWPM)
@@ -51,6 +53,7 @@ func BuildSummary(sessions []model.SessionResult, topN int) Summary {
 	n := float64(len(sessions))
 	out.AvgGrossWPM = scoring.Round2(out.AvgGrossWPM / n)
 	out.AvgNetWPM = scoring.Round2(out.AvgNetWPM / n)
+	out.AvgAdjustedWPM = scoring.Round2(out.AvgAdjustedWPM / n)
 	out.AvgAccuracy = scoring.Round2(out.AvgAccuracy / n)
 	out.AvgErrors = scoring.Round2(out.AvgErrors / n)
 	out.ConsistencyTrend = scoring.ConsistencyFromSamples(netSamples)

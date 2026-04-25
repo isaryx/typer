@@ -304,12 +304,13 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 		printOneSessionResult(out, finished[0])
 		return
 	}
-	var sumGross, sumNet, sumAcc, sumCons float64
+	var sumGross, sumNet, sumAdjusted, sumAcc, sumCons float64
 	var sumElapsed int64
 	sumErr := 0
 	for _, r := range finished {
 		sumGross += r.Metrics.GrossWPM
 		sumNet += r.Metrics.NetWPM
+		sumAdjusted += r.Metrics.AdjustedWPM
 		sumAcc += r.Metrics.Accuracy
 		sumCons += r.Metrics.Consistency
 		sumElapsed += r.ElapsedMS
@@ -318,17 +319,18 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 	n := float64(len(finished))
 	avgGross := sumGross / n
 	avgNet := sumNet / n
+	avgAdjusted := sumAdjusted / n
 	avgAcc := sumAcc / n
 	avgCons := sumCons / n
-	printMetricsTable(out, fmt.Sprintf("Summary (%d completed sessions)", len(finished)), avgGross, avgNet, avgAcc, avgCons, sumErr, sumElapsed, true)
+	printMetricsTable(out, fmt.Sprintf("Summary (%d completed sessions)", len(finished)), avgGross, avgNet, avgAdjusted, avgAcc, avgCons, sumErr, sumElapsed, true)
 }
 
 func printOneSessionResult(out io.Writer, r model.SessionResult) {
 	m := r.Metrics
-	printMetricsTable(out, "Session result", m.GrossWPM, m.NetWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
+	printMetricsTable(out, "Session result", m.GrossWPM, m.NetWPM, m.AdjustedWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
 }
 
-func printMetricsTable(out io.Writer, heading string, gross, net, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
+func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "  · "+heading)
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
@@ -338,6 +340,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, acc, cons floa
 	if summary {
 		printRow("Avg gross WPM", fmt.Sprintf("%.2f", gross))
 		printRow("Avg net WPM", fmt.Sprintf("%.2f", net))
+		printRow("Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted))
 		printRow("Avg accuracy", fmt.Sprintf("%.2f%%", acc))
 		printRow("Avg consistency", fmt.Sprintf("%.2f", cons))
 		printRow("Total errors", fmt.Sprintf("%d", errCount))
@@ -345,6 +348,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, acc, cons floa
 	} else {
 		printRow("Gross WPM", fmt.Sprintf("%.2f", gross))
 		printRow("Net WPM", fmt.Sprintf("%.2f", net))
+		printRow("Adjusted WPM", fmt.Sprintf("%.2f", adjusted))
 		printRow("Accuracy", fmt.Sprintf("%.2f%%", acc))
 		if cons > 0 {
 			printRow("Consistency", fmt.Sprintf("%.2f", cons))
@@ -525,6 +529,7 @@ func runStats(args []string, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "Stats for last %d session(s).\n", sum.Sessions)
 	fmt.Fprintf(stdout, "Avg Gross WPM     : %.2f\n", sum.AvgGrossWPM)
 	fmt.Fprintf(stdout, "Avg Net WPM       : %.2f\n", sum.AvgNetWPM)
+	fmt.Fprintf(stdout, "Avg Adjusted WPM  : %.2f\n", sum.AvgAdjustedWPM)
 	fmt.Fprintf(stdout, "Avg Accuracy      : %.2f%%\n", sum.AvgAccuracy)
 	fmt.Fprintf(stdout, "Avg Errors        : %.2f\n", sum.AvgErrors)
 	fmt.Fprintf(stdout, "Consistency Trend : %.2f\n", sum.ConsistencyTrend)

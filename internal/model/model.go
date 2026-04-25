@@ -28,6 +28,7 @@ type SessionOptions struct {
 type SessionMetrics struct {
 	GrossWPM    float64 `json:"gross_wpm"`
 	NetWPM      float64 `json:"net_wpm"`
+	AdjustedWPM float64 `json:"adjusted_wpm"`
 	Accuracy    float64 `json:"accuracy"`
 	Consistency float64 `json:"consistency"`
 	Errors      int     `json:"errors"`

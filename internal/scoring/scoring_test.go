@@ -26,6 +26,9 @@ func TestCompute_PerfectTyping(t *testing.T) {
 	if metrics.NetWPM != metrics.GrossWPM {
 		t.Fatalf("expected net == gross when no errors, got gross=%.2f net=%.2f", metrics.GrossWPM, metrics.NetWPM)
 	}
+	if metrics.AdjustedWPM != metrics.GrossWPM {
+		t.Fatalf("expected adjusted == gross at 100%% accuracy, got gross=%.2f adjusted=%.2f", metrics.GrossWPM, metrics.AdjustedWPM)
+	}
 }
 
 func TestCompute_WithUncorrectedErrors(t *testing.T) {
@@ -45,6 +48,9 @@ func TestCompute_WithUncorrectedErrors(t *testing.T) {
 	}
 	if metrics.NetWPM > metrics.GrossWPM {
 		t.Fatalf("net wpm should not exceed gross wpm")
+	}
+	if metrics.AdjustedWPM >= metrics.GrossWPM {
+		t.Fatalf("expected adjusted wpm below gross when accuracy < 100, got gross=%.2f adjusted=%.2f", metrics.GrossWPM, metrics.AdjustedWPM)
 	}
 }
 

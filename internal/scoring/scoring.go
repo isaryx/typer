@@ -51,10 +51,12 @@ func Compute(target, typed string, elapsed time.Duration, ks Keystrokes) model.S
 	if total > 0 {
 		accuracy = (float64(correct) / float64(total)) * 100.0
 	}
+	adjusted := gross * (accuracy / 100.0)
 
 	return model.SessionMetrics{
 		GrossWPM:    Round2(gross),
 		NetWPM:      Round2(net),
+		AdjustedWPM: Round2(adjusted),
 		Accuracy:    Round2(accuracy),
 		Consistency: 0,
 		Errors:      uncorrected,

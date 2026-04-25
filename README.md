@@ -106,14 +106,42 @@ Other entries in `go.sum` are transitive dependencies (Charm’s terminal stack,
 
 ## Session metrics
 
-After a run, the CLI prints the same numbers that are stored in history (see `internal/scoring` for formulas).
+After a run, the CLI prints the same numbers that are stored in history.
 
-- **Gross WPM** — Keystroke-based words per minute: (keystrokes / 5) / minutes elapsed.
-- **Net WPM** — Gross WPM minus uncorrected character errors per minute.
-- **Accuracy** — Share of keystrokes that matched the expected character at the time of the keypress.
-- **Errors** — Count of character-level mismatches still present when a word is submitted (and similar effects from length skew).
-- **Consistency** — Score from **0 to 100** for how *steady* your *speed* was: after each completed word, a running gross WPM is sampled, and the spread of those samples is turned into a score (**100** = very stable, lower = more up-and-down pace). It is *not* accuracy; you can be consistently slow or fast.
-- **Time** — Wall-clock duration of the session (shown in a readable form in the result table).
+### Scoring contract (current behavior)
+
+`typer` uses the common typing-test convention of **5 characters = 1 word**.
+
+Formulas:
+
+- **Gross WPM** = `(totalKeystrokes / 5) / minutesElapsed`
+- **Net WPM** = `GrossWPM - (uncorrectedErrors / minutesElapsed)` (floored at `0`)
+- **Adjusted WPM** = `GrossWPM * (Accuracy / 100)`
+- **Accuracy (%)** = `(correctKeystrokes / totalKeystrokes) * 100`
+
+These formulas are implemented in `internal/scoring/scoring.go`.
+
+### Counting rules
+
+- **`totalKeystrokes`** counts rune keypresses typed into the active word.
+- **`correctKeystrokes`** counts rune keypresses that match the expected rune at the time of press.
+- **Backspace, Space, and Enter** are not counted as keystrokes for WPM/accuracy.
+- **`uncorrectedErrors`** is measured when a word is submitted and includes:
+  - wrong characters at aligned positions,
+  - extra typed characters,
+  - missing trailing target characters.
+
+### Strict vs non-strict
+
+- **Strict mode (`--strict`, `-s`)**: you cannot advance unless the current word matches exactly, so submitted-word errors are typically `0`.
+- **Non-strict mode (default)**: you can advance with mismatches; those mismatches contribute to `uncorrectedErrors`.
+
+### Edge cases and display
+
+- If elapsed time is zero or extremely small, scoring uses a minimum of **1 second** (`1/60` minute) to avoid divide-by-zero.
+- All displayed/stored metric values are rounded to 2 decimals.
+- **Consistency** is a separate `0-100` steadiness score derived from per-word gross-WPM samples (not an accuracy metric).
+- **Time** is wall-clock session duration.
 
 ## Data Credits
 

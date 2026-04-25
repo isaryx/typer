@@ -158,3 +158,16 @@ func TestWrapWidth_capsWideTerminal(t *testing.T) {
 		t.Fatalf("wrapWidth(40) = %d, want 40", got)
 	}
 }
+
+func TestView_IncludesPromptModeInMetaLine(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello world", Mode: model.ModeWords},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+	)
+	got := m.View()
+	if !strings.Contains(got, "Mode: non-strict (words)") {
+		t.Fatalf("expected mode label in header, got %q", got)
+	}
+}

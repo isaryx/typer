@@ -137,7 +137,11 @@ func (m typingSessionModel) View() string {
 	if !m.strict {
 		strictMode = "non-strict"
 	}
-	b.WriteString(m.styles.meta.Width(tw).Render(fmt.Sprintf("Mode: %s  |  Progress: %d/%d", strictMode, m.wordIndex, len(m.words))))
+	sessionMode := m.prompt.Mode
+	if sessionMode == "" {
+		sessionMode = "unknown"
+	}
+	b.WriteString(m.styles.meta.Width(tw).Render(fmt.Sprintf("Mode: %s (%s)  |  Progress: %d/%d", strictMode, sessionMode, m.wordIndex, len(m.words))))
 	b.WriteString("\n")
 	if m.prompt.Author != "" {
 		b.WriteString("\n")
