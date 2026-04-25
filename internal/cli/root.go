@@ -25,6 +25,17 @@ const noHistoryMessage = "No history yet. Run `typer start` first."
 
 const resetProgressFlag = "--reset-progress"
 
+const creditsMessage = `Data Credits
+------------
+- Words mode default list (assets/words.txt): first20hours/google-10000-english
+- Original corpus source: Google Web Trillion Word Corpus (via LDC), cleaned by Josh Kaufman; subsets by Peter Norvig
+- Passages mode bundled list (assets/passages.txt): Thomas Preston's Dictionary of English Proverbs and Proverbial Phrases (Project Gutenberg #39281)
+- Quotes mode bundled list (assets/quotes.json): curated from dwyl/quotes
+- Optional remote quote API source (when --source=remote): https://type.fit/api/quotes
+
+See README "Data Credits" for details and usage notes.
+`
+
 var newHistoryStore = storage.NewHistoryStore
 
 // extractPresenceFlags removes bare strict / indefinite tokens from args
@@ -98,6 +109,8 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return runHistory(args[1:], stdout)
 	case "stats":
 		return runStats(args[1:], stdout)
+	case "credits":
+		return runCredits(stdout)
 	case "version", "--version", "-v":
 		return runVersion(stdout)
 	case resetProgressFlag:
@@ -117,6 +130,11 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 
 func runVersion(out io.Writer) error {
 	_, err := fmt.Fprintf(out, "typer %s\n", version.Version)
+	return err
+}
+
+func runCredits(out io.Writer) error {
+	_, err := fmt.Fprint(out, creditsMessage)
 	return err
 }
 
@@ -174,13 +192,13 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	fs.SetOutput(io.Discard)
 
 	var mode string
-	fs.StringVar(&mode, "mode", "passages", "Text mode: passages|p, words|w, or quotes|q.")
-	fs.StringVar(&mode, "m", "passages", "Shorthand for --mode (same values as --mode).")
+	fs.StringVar(&mode, "mode", "quotes", "Text mode: passages|p, words|w, or quotes|q.")
+	fs.StringVar(&mode, "m", "quotes", "Shorthand for --mode (same values as --mode).")
 	var words int
 	fs.IntVar(&words, "words", 15, "Number of words per prompt (words mode only).")
 	fs.IntVar(&words, "w", 15, "Shorthand for --words.")
 	var source string
-	fs.StringVar(&source, "source", "remote", "Quotes mode fetch policy: auto|remote|cache|seed.")
+	fs.StringVar(&source, "source", "seed", "Quotes mode fetch policy: auto|remote|cache|seed.")
 
 	rest, strict, indefinite, err := extractPresenceFlags(args)
 	if err != nil {
@@ -540,6 +558,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  set          Save custom words and/or passages file paths.")
 	fmt.Fprintln(out, "  history      List recent sessions from local history.")
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
+	fmt.Fprintln(out, "  credits      Show data source credits.")
 	fmt.Fprintln(out, "  version      Print the installed typer version.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Quick reference:")
@@ -548,6 +567,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out, "  typer stats [--last N]")
+	fmt.Fprintln(out, "  typer credits")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Per-command help:")
 	fmt.Fprintln(out, "  typer start -h | typer start --help")
@@ -565,9 +585,9 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "  -m, --mode string    Text mode: passages|p, words|w, or quotes|q (default passages).")
+	fmt.Fprintln(out, "  -m, --mode string    Text mode: passages|p, words|w, or quotes|q (default quotes).")
 	fmt.Fprintln(out, "  -w, --words int      Words per prompt in words mode (default 15).")
-	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default remote).")
+	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default seed).")
 	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
 }

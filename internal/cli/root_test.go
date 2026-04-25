@@ -82,6 +82,19 @@ func TestExecute_HelpAliases(t *testing.T) {
 	}
 }
 
+func TestExecute_Credits(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if err := Execute(context.Background(), []string{"credits"}, strings.NewReader(""), &stdout, &stderr); err != nil {
+		t.Fatalf("Execute credits: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Data Credits") {
+		t.Fatalf("expected credits heading, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "type.fit") {
+		t.Fatalf("expected quote API credit in output, got %q", stdout.String())
+	}
+}
+
 func TestExecute_UnknownCommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	err := Execute(context.Background(), []string{"nope"}, strings.NewReader(""), &stdout, &stderr)
@@ -126,6 +139,12 @@ func TestRunStart_HelpShortCircuits(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Run an interactive typing session") {
 		t.Fatalf("expected start help, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "(default quotes)") {
+		t.Fatalf("expected quotes default in start help, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "(default seed)") {
+		t.Fatalf("expected seed source default in start help, got %q", stdout.String())
 	}
 }
 

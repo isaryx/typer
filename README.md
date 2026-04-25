@@ -40,6 +40,10 @@ go run ./cmd/typer version
 ```
 
 ```bash
+go run ./cmd/typer credits
+```
+
+```bash
 typer set --words-file ./path-to-words.txt
 typer set --passages-file ./path-to-passages.txt
 typer set --words-file ./words.txt --passages-file ./passages.txt
