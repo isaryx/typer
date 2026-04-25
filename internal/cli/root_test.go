@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -51,6 +52,19 @@ func setupTestHistoryStoreFactory(t *testing.T, seed ...model.SessionResult) str
 		return storage.NewHistoryStoreAt(path), nil
 	}
 	return path
+}
+
+func setTestUserDirs(t *testing.T, home string) {
+	t.Helper()
+
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", home)
+		t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+		t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
+	}
 }
 
 func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
@@ -410,7 +424,7 @@ func TestRunSetRejectsPositionalArgs(t *testing.T) {
 
 func TestRunSetRejectsMissingOrDirectoryPath(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestUserDirs(t, home)
 
 	var out bytes.Buffer
 	err := runSet([]string{testFlagWordsFile, filepath.Join(home, "missing.txt")}, &out)
@@ -433,7 +447,7 @@ func TestRunSetRejectsMissingOrDirectoryPath(t *testing.T) {
 
 func TestRunSetSavesAbsolutePathsForBothFiles(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestUserDirs(t, home)
 
 	words := filepath.Join(home, "words.txt")
 	passages := filepath.Join(home, "passages.txt")
@@ -472,7 +486,7 @@ func TestRunSetSavesAbsolutePathsForBothFiles(t *testing.T) {
 
 func TestRunHistoryEmptyAndTruncatedListing(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestUserDirs(t, home)
 
 	store, err := storage.NewHistoryStore()
 	if err != nil {
@@ -533,7 +547,7 @@ func TestRunHistoryRejectsPositionalArgs(t *testing.T) {
 
 func TestRunStatsEmptyAndSummaryOutput(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestUserDirs(t, home)
 
 	store, err := storage.NewHistoryStore()
 	if err != nil {

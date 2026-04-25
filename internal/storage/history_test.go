@@ -23,12 +23,7 @@ func newHistoryStoreAt(t *testing.T) *HistoryStore {
 
 func TestNewHistoryStoreUsesConfigDir(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	if runtime.GOOS == "windows" {
-		t.Setenv("USERPROFILE", home)
-		t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
-		t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
-	}
+	setTestUserDirs(t, home)
 	want := filepath.Join(typerConfigDirForTestHome(home), historyJSONFile)
 
 	store, err := NewHistoryStore()
