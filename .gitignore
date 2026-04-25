@@ -1,0 +1,39 @@
+# Built binary (repo root)
+/typer
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+
+# Dependency / workspace
+vendor/
+go.work
+go.work.sum
+
+# Python (e.g. scripts/)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / tooling
+*.swp
+*~
+.idea/
