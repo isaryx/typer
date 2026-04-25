@@ -141,7 +141,7 @@ These formulas are implemented in `internal/scoring/scoring.go`.
 - If elapsed time is zero or extremely small, scoring uses a minimum of **1 second** (`1/60` minute) to avoid divide-by-zero.
 - All displayed/stored metric values are rounded to 2 decimals.
 - **Consistency** is a separate `0-100` steadiness score derived from per-word gross-WPM samples (not an accuracy metric).
-- **Time** is wall-clock session duration.
+- **Time** starts on the first typed rune and ends when the session completes (or aborts).
 
 ## Data Credits
 

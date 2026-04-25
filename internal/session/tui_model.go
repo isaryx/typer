@@ -74,7 +74,6 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		wpmSamples:  make([]float64, 0, n),
 		strict:      strict,
 		now:         now,
-		startedAt:   now().UTC(),
 		styles:      defaultStyles(),
 		indefinite:  indefinite,
 	}
@@ -313,6 +312,7 @@ func (m *typingSessionModel) commitCurrentWord() {
 		m.status = ""
 		return
 	}
+	m.startTimerIfNeeded()
 
 	if !matched {
 		m.totalErrors++
@@ -344,6 +344,13 @@ func (m *typingSessionModel) appendWPMSample() {
 	m.wpmSamples = append(m.wpmSamples, gross)
 }
 
+func (m *typingSessionModel) startTimerIfNeeded() {
+	if !m.startedAt.IsZero() {
+		return
+	}
+	m.startedAt = m.now().UTC()
+}
+
 func (m typingSessionModel) isDone() bool {
 	return m.wordIndex >= len(m.words) && len(m.words) > 0
 }
@@ -353,9 +360,14 @@ func (m typingSessionModel) result() typingSessionResult {
 	if ended.IsZero() {
 		ended = m.now().UTC()
 	}
+	started := m.startedAt
+	if started.IsZero() {
+		// No typed rune happened in this run; keep a sane, non-zero timeline.
+		started = ended
+	}
 	return typingSessionResult{
 		TypedText:         strings.Join(m.typedWords, " "),
-		StartedAt:         m.startedAt,
+		StartedAt:         started,
 		EndedAt:           ended,
 		Completed:         m.isDone() && !m.aborted,
 		Aborted:           m.aborted,
@@ -397,6 +409,9 @@ func runTypingSession(input io.Reader, output io.Writer, prompt model.Prompt, st
 func (m *typingSessionModel) appendRunes(runes []rune) {
 	if m.wordIndex >= len(m.words) {
 		return
+	}
+	if len(runes) > 0 {
+		m.startTimerIfNeeded()
 	}
 
 	target := []rune(m.words[m.wordIndex])

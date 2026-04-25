@@ -171,3 +171,49 @@ func TestView_IncludesPromptModeInMetaLine(t *testing.T) {
 		t.Fatalf("expected mode label in header, got %q", got)
 	}
 }
+
+func TestAppendRunes_StartsTimerOnFirstKeystroke(t *testing.T) {
+	t0 := time.Unix(100, 0)
+	now := t0
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello world"},
+		false,
+		func() time.Time { return now },
+		false,
+	)
+	if !m.startedAt.IsZero() {
+		t.Fatalf("expected zero startedAt before typing, got %v", m.startedAt)
+	}
+
+	now = t0.Add(2 * time.Second)
+	m.appendRunes([]rune("h"))
+	if got := m.startedAt; !got.Equal(now.UTC()) {
+		t.Fatalf("startedAt after first keystroke = %v, want %v", got, now.UTC())
+	}
+
+	now = t0.Add(5 * time.Second)
+	m.appendRunes([]rune("e"))
+	if got := m.startedAt; !got.Equal(t0.Add(2 * time.Second).UTC()) {
+		t.Fatalf("startedAt changed after subsequent keystroke = %v", got)
+	}
+}
+
+func TestResult_UsesEndTimeWhenNoTypingOccurred(t *testing.T) {
+	now := time.Unix(200, 0)
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello world"},
+		false,
+		func() time.Time { return now },
+		false,
+	)
+	m.aborted = true
+	m.endedAt = now.UTC()
+
+	got := m.result()
+	if !got.StartedAt.Equal(now.UTC()) {
+		t.Fatalf("StartedAt = %v, want endedAt %v when no typing occurred", got.StartedAt, now.UTC())
+	}
+	if !got.EndedAt.Equal(now.UTC()) {
+		t.Fatalf("EndedAt = %v, want %v", got.EndedAt, now.UTC())
+	}
+}
