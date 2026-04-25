@@ -347,7 +347,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 		fmt.Fprintf(out, boxTopFmt, horizontalBar)
 		fmt.Fprintf(out, boxInnerFmt, heading)
 		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, "SPEED                               CONTROL")
+		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg gross WPM", fmt.Sprintf("%.2f", gross), "Avg accuracy", fmt.Sprintf("%.2f%%", acc)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg net WPM", fmt.Sprintf("%.2f", net), "Avg consistency", fmt.Sprintf("%.2f", cons)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Total errors", fmt.Sprintf("%d", errCount)))
@@ -357,7 +357,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 	} else {
 		fmt.Fprintf(out, boxTopFmt, horizontalBar)
 		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, "SPEED                               CONTROL")
+		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Gross WPM", fmt.Sprintf("%.2f", gross), "Accuracy", fmt.Sprintf("%.2f%%", acc)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Net WPM", fmt.Sprintf("%.2f", net), "Consistency", fmt.Sprintf("%.2f", cons)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Errors", fmt.Sprintf("%d", errCount)))
