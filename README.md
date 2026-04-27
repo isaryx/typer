@@ -4,6 +4,7 @@ Cross-platform typing trainer CLI written in Go.
 
 ## Features
 
+- English-only UI and bundled practice text
 - Sessions: **passages**, **words**, or **quotes**
 - Gross/net WPM, accuracy, errors, elapsed time; history saved locally as JSON
 - Offline-first with bundled text and quote seeds
