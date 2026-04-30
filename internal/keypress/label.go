@@ -2,6 +2,7 @@ package keypress
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -27,23 +28,23 @@ func truncateRunes(s string, max int) string {
 	if max <= 0 {
 		return s
 	}
-	if max == 1 {
-		for range s {
-			return "…"
-		}
+	// One full rune count avoids mis-handling max==1 (old code treated every
+	// non-empty string as "…") and matches "at most max runes in output" when
+	// we add an ellipsis.
+	if utf8.RuneCountInString(s) <= max {
 		return s
 	}
 	var b strings.Builder
-	written := 0
+	n := 0
 	for _, r := range s {
-		if written >= max-1 {
+		if n >= max-1 {
 			b.WriteRune('…')
 			return b.String()
 		}
 		b.WriteRune(r)
-		written++
+		n++
 	}
-	return s
+	return b.String()
 }
 
 // AppendHistory appends label and keeps at most max entries (oldest dropped).

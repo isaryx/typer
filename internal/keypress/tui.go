@@ -16,6 +16,9 @@ const (
 
 const historyMax = 10
 
+// historyItemMaxRunes is the default cap per entry; View() may lower it from terminal width.
+const historyItemMaxRunes = 18
+
 type keyPressModel struct {
 	width     int
 	height    int
@@ -86,8 +89,21 @@ func (m keyPressModel) View() string {
 
 	mid := lipgloss.JoinVertical(lipgloss.Center, title, "", bigLine)
 	if len(m.history) > 0 {
+		n := len(m.history)
+		itemMax := historyItemMaxRunes
+		if tw > 0 && n > 0 {
+			sepW := 3 * (n - 1) // " · " between entries
+			per := (tw - sepW) / n
+			if per >= 4 && per < itemMax {
+				itemMax = per
+			}
+		}
+		parts := make([]string, n)
+		for i, h := range m.history {
+			parts[i] = truncateRunes(h, itemMax)
+		}
 		recent := m.meta.Width(tw).Align(lipgloss.Center).Render(
-			strings.Join(m.history, " · "),
+			strings.Join(parts, " · "),
 		)
 		mid = lipgloss.JoinVertical(lipgloss.Center, mid, "", recent)
 	}

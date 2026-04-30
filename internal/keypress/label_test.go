@@ -77,6 +77,23 @@ func TestDisplayLabel_truncatesLongInput(t *testing.T) {
 	}
 }
 
+func TestTruncateRunes(t *testing.T) {
+	t.Parallel()
+	if got := truncateRunes("a", 1); got != "a" {
+		t.Fatalf("truncateRunes(%q, 1) = %q, want %q", "a", got, "a")
+	}
+	if got := truncateRunes("ab", 1); got != "…" {
+		t.Fatalf("truncateRunes(%q, 1) = %q, want %q", "ab", got, "…")
+	}
+	if got := truncateRunes("hi", 4); got != "hi" {
+		t.Fatalf("truncateRunes(%q, 4) = %q, want %q", "hi", got, "hi")
+	}
+	long := strings.Repeat("x", 10)
+	if got := truncateRunes(long, 4); got != "xxx…" {
+		t.Fatalf("truncateRunes(10 x's, 4) = %q, want %q", got, "xxx…")
+	}
+}
+
 func TestAppendHistory(t *testing.T) {
 	t.Parallel()
 	var h []string
