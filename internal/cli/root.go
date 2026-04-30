@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"typer/internal/analytics"
 	"typer/internal/keypress"
 	"typer/internal/model"
@@ -22,6 +24,12 @@ import (
 )
 
 const noHistoryMessage = "No history yet. Run `typer start` first."
+
+// Replay comparison line colors (match TUI palette: muted green / salmon red).
+var (
+	replayDeltaGood = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
+	replayDeltaBad  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+)
 
 const resetProgressFlag = "--reset-progress"
 
@@ -342,6 +350,10 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 		return errors.New("cannot replay: stored prompt has no words")
 	}
 
+	if msg := typingTraceUserNote(baseline); msg != "" {
+		fmt.Fprintln(stdout, msg)
+	}
+
 	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
 	opts := model.SessionOptionsForReplay(baseline)
 	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
@@ -365,17 +377,60 @@ func printReplayComparison(out io.Writer, previous, current model.SessionResult)
 		return
 	}
 	dNet := current.Metrics.NetWPM - previous.Metrics.NetWPM
+	dAcc := current.Metrics.Accuracy - previous.Metrics.Accuracy
+	dErr := current.Metrics.Errors - previous.Metrics.Errors
 	deltaMS := current.ElapsedMS - previous.ElapsedMS
 	fmt.Fprintln(out, "Comparison:")
-	fmt.Fprintf(out, "  Net WPM: %+.2f  (was %.2f →  %.2f)\n", dNet, previous.Metrics.NetWPM, current.Metrics.NetWPM)
+	fmt.Fprintf(out, "  Net WPM:  %s (%.2f →  %.2f)\n",
+		styleHigherBetterDelta(dNet).Render(fmt.Sprintf("%+.2f", dNet)),
+		previous.Metrics.NetWPM, current.Metrics.NetWPM)
+	fmt.Fprintf(out, "  Accuracy: %s (%.2f%% →  %.2f%%)\n",
+		styleHigherBetterDelta(dAcc).Render(fmt.Sprintf("%+.2f%%", dAcc)),
+		previous.Metrics.Accuracy, current.Metrics.Accuracy)
+	fmt.Fprintf(out, "  Errors:   %s (%d →  %d)\n",
+		styleFewerErrorsBetterDelta(dErr).Render(fmt.Sprintf("%+d", dErr)),
+		previous.Metrics.Errors, current.Metrics.Errors)
 	switch {
 	case deltaMS < 0:
-		fmt.Fprintf(out, "  Time:    %s faster  (%s →  %s)\n", formatElapsedMS(-deltaMS), formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+		timePhrase := replayDeltaGood.Render(fmt.Sprintf("%s faster", formatElapsedMS(-deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
 	case deltaMS > 0:
-		fmt.Fprintf(out, "  Time:    %s slower  (%s →  %s)\n", formatElapsedMS(deltaMS), formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+		timePhrase := replayDeltaBad.Render(fmt.Sprintf("%s slower", formatElapsedMS(deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
 	default:
-		fmt.Fprintf(out, "  Time:    same  (%s)\n", formatElapsedMS(current.ElapsedMS))
+		fmt.Fprintf(out, "  Time:     same  (%s)\n", formatElapsedMS(current.ElapsedMS))
 	}
+}
+
+func styleHigherBetterDelta(delta float64) lipgloss.Style {
+	switch {
+	case delta > 0:
+		return replayDeltaGood
+	case delta < 0:
+		return replayDeltaBad
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+func styleFewerErrorsBetterDelta(delta int) lipgloss.Style {
+	switch {
+	case delta < 0:
+		return replayDeltaGood
+	case delta > 0:
+		return replayDeltaBad
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+// typingTraceUserNote is a one-line notice when the baseline has no stored keystroke trace
+// (older sessions or future options to omit traces), so the TUI will not show a shadow.
+func typingTraceUserNote(baseline model.SessionResult) string {
+	if len(baseline.TypingTrace) == 0 {
+		return "Note: This session has no typing trace; shadow replay is unavailable."
+	}
+	return ""
 }
 
 func printStartResults(out io.Writer, results []model.SessionResult) {
@@ -777,6 +832,7 @@ func printReplayHelp(out io.Writer) {
 	fmt.Fprintln(out, "Replay a session chosen with --last, --nth, or --id (session ids are listed by typer history).")
 	fmt.Fprintln(out, "Your new run is compared to the saved result. When the session includes a typing trace,")
 	fmt.Fprintln(out, "a dim \"shadow\" replays the previous keystrokes in real time while you type below.")
+	fmt.Fprintln(out, "Sessions without a trace (e.g. saved before traces existed) still replay the text; a note is printed.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer replay --last")

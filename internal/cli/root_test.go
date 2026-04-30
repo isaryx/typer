@@ -556,6 +556,44 @@ func TestRunReplayRequiresSelector(t *testing.T) {
 	}
 }
 
+func TestTypingTraceUserNote(t *testing.T) {
+	if got := typingTraceUserNote(model.SessionResult{}); got == "" {
+		t.Fatal("expected note when trace empty")
+	}
+	if got := typingTraceUserNote(model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "a"}}}); got != "" {
+		t.Fatalf("expected no note when trace present, got %q", got)
+	}
+}
+
+func TestPrintReplayComparisonIncludesAccuracyAndErrors(t *testing.T) {
+	var out bytes.Buffer
+	printReplayComparison(&out,
+		model.SessionResult{
+			Metrics:   model.SessionMetrics{NetWPM: 40, Accuracy: 98.5, Errors: 2},
+			ElapsedMS: 10000,
+		},
+		model.SessionResult{
+			Metrics:   model.SessionMetrics{NetWPM: 42, Accuracy: 99.2, Errors: 1},
+			ElapsedMS: 9500,
+		},
+	)
+	got := out.String()
+	for _, want := range []string{
+		"Net WPM:",
+		"+2.00",
+		"Accuracy:",
+		"+0.70%",
+		"Errors:",
+		"-1",
+		"Time:",
+		"faster",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRunStatsEmptyAndSummaryOutput(t *testing.T) {
 	home := t.TempDir()
 	setTestUserDirs(t, home)

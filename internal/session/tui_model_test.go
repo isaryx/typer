@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -373,6 +374,42 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 	s := m.renderMergedActiveWord("hello")
 	if !strings.Contains(s, markGhostCaret) {
 		t.Fatalf("expected ghost mark in merged render: %q", s)
+	}
+}
+
+func TestFormatReplaySessionLabel(t *testing.T) {
+	t.Setenv("TZ", "UTC")
+	if got, want := formatReplaySessionLabel("2026-04-30T12:04:05.123456789Z"), "2026-04-30 12:04:05"; got != want {
+		t.Fatalf("RFC3339Nano: got %q want %q", got, want)
+	}
+	if got, want := formatReplaySessionLabel("2026-04-30T12:04:05Z"), "2026-04-30 12:04:05"; got != want {
+		t.Fatalf("RFC3339: got %q want %q", got, want)
+	}
+	long := strings.Repeat("x", 40)
+	if got := formatReplaySessionLabel(long); !strings.HasSuffix(got, "…") || utf8.RuneCountInString(got) != 34 {
+		t.Fatalf("truncate non-time id: %q (runes=%d)", got, utf8.RuneCountInString(got))
+	}
+	if formatReplaySessionLabel("") != "" {
+		t.Fatal("empty id")
+	}
+}
+
+func TestViewReplayTitleUsesShortSessionLabel(t *testing.T) {
+	t.Setenv("TZ", "UTC")
+	m := newTypingSessionModel(
+		model.Prompt{Content: "a b"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{
+			ID:        "2026-04-30T12:04:05.000000000Z",
+			Metrics:   model.SessionMetrics{NetWPM: 10, Accuracy: 90, Errors: 0},
+			ElapsedMS: 1000,
+		},
+	)
+	v := m.View()
+	if !strings.Contains(v, "Replay · 2026-04-30 12:04:05") {
+		t.Fatalf("expected short label in view, got:\n%s", v)
 	}
 }
 

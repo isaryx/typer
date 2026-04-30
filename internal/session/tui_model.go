@@ -177,7 +177,7 @@ func (m *typingSessionModel) View() string {
 	if m.replay != nil {
 		replayTitle := "Replay"
 		if m.replay.ID != "" {
-			replayTitle = fmt.Sprintf("Replay · %s", m.replay.ID)
+			replayTitle = fmt.Sprintf("Replay · %s", formatReplaySessionLabel(m.replay.ID))
 		}
 		b.WriteString(m.styles.title.Width(tw).Render(replayTitle))
 		b.WriteString("\n")
@@ -686,6 +686,24 @@ func (m *typingSessionModel) result() typingSessionResult {
 		UncorrectedErrors: m.uncorrectedErrors,
 		TypingTrace:       append([]model.ReplayEvent(nil), m.typingTrace...),
 	}
+}
+
+// formatReplaySessionLabel shortens a stored session id (RFC3339Nano) for the header;
+// other ids are truncated if very long.
+func formatReplaySessionLabel(id string) string {
+	if id == "" {
+		return ""
+	}
+	if t, err := time.Parse(time.RFC3339Nano, id); err == nil {
+		return t.Local().Format("2006-01-02 15:04:05")
+	}
+	if t, err := time.Parse(time.RFC3339, id); err == nil {
+		return t.Local().Format("2006-01-02 15:04:05")
+	}
+	if len(id) > 36 {
+		return id[:33] + "…"
+	}
+	return id
 }
 
 func formatReplaySummary(prev *model.SessionResult) string {
