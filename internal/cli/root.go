@@ -216,6 +216,9 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	var source string
 	fs.StringVar(&source, "source", "seed", "Quotes mode fetch policy: auto|remote|cache|seed.")
 
+	var noGhost bool
+	fs.BoolVar(&noGhost, "no-ghost", false, "Do not use a ghost overlay from the best prior run of the same text (default is to use one when available).")
+
 	rest, strict, indefinite, err := extractPresenceFlags(args)
 	if err != nil {
 		return err
@@ -267,6 +270,21 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	historyStore, err := storage.NewHistoryStore()
 	if err != nil {
 		return err
+	}
+	if !noGhost {
+		hst := historyStore
+		runner.GhostBaseline = func(ctx context.Context, p model.Prompt) (*model.SessionResult, error) {
+			h := model.PromptContentHash(p.Content)
+			best, err := hst.BestSessionForGhost(h)
+			if err != nil {
+				if errors.Is(err, storage.ErrNoGhostCandidate) {
+					return nil, nil
+				}
+				return nil, err
+			}
+			b := best
+			return &b, nil
+		}
 	}
 
 	opts := model.SessionOptions{
@@ -747,7 +765,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Quick reference:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--no-ghost]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out, "  typer replay --last | --nth N | --id ID")
@@ -787,10 +805,11 @@ func runKeyPress(ctx context.Context, args []string, stdin io.Reader, stdout io.
 
 func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "Run an interactive typing session.")
+	fmt.Fprintln(out, "When local history has a best prior run of the same text with a typing trace, it is used as the ghost overlay unless --no-ghost.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--no-ghost]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -799,6 +818,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default seed).")
 	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
+	fmt.Fprintln(out, "      --no-ghost       Skip the ghost overlay from history (by default, the best prior run of the same text is used when a typing trace exists).")
 }
 
 func printSetHelp(out io.Writer) {

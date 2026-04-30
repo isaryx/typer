@@ -60,7 +60,7 @@ go build -ldflags "-X typer/internal/version.Version=0.01" -o typer ./cmd/typer
 
 ## Privacy & local data
 
-Session history and settings stay on your machine (for example under `~/.config/typer` / `~/.cache/typer` on Linux). History stores what you typed so you can review sessions later.
+Session history and settings stay on your machine (for example under `~/.config/typer` / `~/.cache/typer` on Linux). History stores what you typed so you can review sessions later. Each session also stores a **SHA-256 hash** of the canonical prompt text (not reversible to recover the passage from the hash alone) so runs with the same text can be grouped—`typer start` uses a ghost overlay from the **best** saved run of the same text when one exists (with a typing trace). Pass `--no-ghost` to turn that off.
 
 ## Credits
 

@@ -68,8 +68,10 @@ type typingSessionModel struct {
 	width int
 	// indefinite shows a hint that Ctrl+C ends the run with a summary (CLI indefinite mode).
 	indefinite bool
-	// replay, when set, shows the previous run’s metrics (replay mode).
+	// replay, when set, holds the prior session for shadow trace and (if showReplayUI) replay chrome.
 	replay *model.SessionResult
+	// showReplayUI is true only for `typer replay`; ghost-from-start uses the normal header without replay lines.
+	showReplayUI bool
 
 	typingTrace []model.ReplayEvent
 
@@ -84,7 +86,7 @@ type typingSessionModel struct {
 	replayClockStart  time.Time
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool) *typingSessionModel {
 	if now == nil {
 		now = time.Now
 	}
@@ -101,16 +103,17 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 	}
 
 	return &typingSessionModel{
-		prompt:      prompt,
-		words:       words,
-		typedWords:  make([]string, 0, n),
-		wordMatches: make([]bool, 0, n),
-		wpmSamples:  make([]float64, 0, n),
-		strict:      strict,
-		now:         now,
-		styles:      defaultStyles(),
-		indefinite:  indefinite,
-		replay:      replay,
+		prompt:       prompt,
+		words:        words,
+		typedWords:   make([]string, 0, n),
+		wordMatches:  make([]bool, 0, n),
+		wpmSamples:   make([]float64, 0, n),
+		strict:       strict,
+		now:          now,
+		styles:       defaultStyles(),
+		indefinite:   indefinite,
+		replay:       replay,
+		showReplayUI: showReplayUI,
 
 		shadowTrace:       shadowTrace,
 		shadowStrict:      shadowStrict,
@@ -174,7 +177,7 @@ func (m *typingSessionModel) View() string {
 
 	tw := m.wrapWidth()
 	var b strings.Builder
-	if m.replay != nil {
+	if m.showReplayUI && m.replay != nil {
 		replayTitle := "Replay"
 		if label := formatReplaySessionLabel(m.replay); label != "" {
 			replayTitle = fmt.Sprintf("Replay · %s", label)
@@ -688,16 +691,18 @@ func (m *typingSessionModel) result() typingSessionResult {
 	}
 }
 
-// formatReplaySessionLabel picks a short datetime for the replay header;
-// it prefers StartedAt (works for ULID ids), then legacy id encodings.
+// formatReplaySessionLabel is the suffix after "Replay ·" (session id when present, else time fallback).
 func formatReplaySessionLabel(sr *model.SessionResult) string {
 	if sr == nil {
 		return ""
 	}
+	if sr.ID != "" {
+		return sr.ID
+	}
 	if !sr.StartedAt.IsZero() {
 		return sr.StartedAt.Local().Format("2006-01-02 15:04:05")
 	}
-	return formatSessionIDForDisplay(sr.ID)
+	return ""
 }
 
 func formatReplaySummary(prev *model.SessionResult) string {
@@ -737,8 +742,8 @@ func formatReplayDuration(ms int64) string {
 	return fmt.Sprintf("%dh %02dm %02ds", h, mins, secs)
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline)
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

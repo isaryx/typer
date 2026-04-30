@@ -26,7 +26,7 @@ type SessionOptions struct {
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
-const SessionResultSchema = 2
+const SessionResultSchema = 3
 
 // ReplayEventKind marks a single timed input in TypingTrace.
 type ReplayEventKind string
@@ -90,6 +90,8 @@ type SessionResult struct {
 	CorrectKeystrokes int                    `json:"correct_keystrokes,omitempty"`
 	WPMSamples        []float64              `json:"wpm_samples,omitempty"`
 	TypingTrace       []ReplayEvent          `json:"typing_trace,omitempty"`
+	// ContentHash is SHA-256 hex of CanonicalPromptContent(Prompt.Content); same text → same hash (any mode).
+	ContentHash       string                 `json:"content_hash,omitempty"`
 }
 
 type HistoryFile struct {

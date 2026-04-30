@@ -19,6 +19,7 @@ func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -38,6 +39,7 @@ func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.appendRunes([]rune("x"))
 	if m.current != "" {
@@ -66,6 +68,7 @@ func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 		},
 		false,
 		nil,
+		false,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -88,6 +91,7 @@ func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.current = "hello"
 	m.commitCurrentWord()
@@ -107,6 +111,7 @@ func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.appendRunes([]rune("hx"))
 	if m.totalKeystrokes != 2 {
@@ -127,6 +132,7 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.appendRunes([]rune("hxllo"))
 	m.commitCurrentWord()
@@ -145,6 +151,7 @@ func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.width = 16
 	out := m.renderWords(14)
@@ -160,6 +167,7 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.width = 200
 	if got := m.wrapWidth(); got != maxWrapWidth {
@@ -178,6 +186,7 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	got := m.View()
 	if !strings.Contains(got, "Mode: non-strict (words)") {
@@ -189,11 +198,12 @@ func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 	t0 := time.Unix(100, 0)
 	now := t0
 	m := newTypingSessionModel(
-					model.Prompt{Content: helloWorldPrompt},
+		model.Prompt{Content: helloWorldPrompt},
 		false,
 		func() time.Time { return now },
 		false,
 		nil,
+		false,
 	)
 	if !m.startedAt.IsZero() {
 		t.Fatalf("expected zero startedAt before typing, got %v", m.startedAt)
@@ -220,6 +230,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 		func() time.Time { return now },
 		false,
 		nil,
+		false,
 	)
 	m.aborted = true
 	m.endedAt = now.UTC()
@@ -240,6 +251,7 @@ func TestInitReturnsNilCommand(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	if cmd := m.Init(); cmd != nil {
 		t.Fatalf("expected nil init command, got %v", cmd)
@@ -253,6 +265,7 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 	)
 	m.current = "hé"
 	gotModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
@@ -273,6 +286,7 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 		},
 		false,
 		nil,
+		false,
 	)
 	m.current = "hello"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
@@ -299,6 +313,7 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 		},
 		false,
 		nil,
+		false,
 	)
 	m.current = "go"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -315,11 +330,12 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 	for _, key := range []tea.KeyType{tea.KeyEsc, tea.KeyCtrlC} {
 		t.Run(key.String(), func(t *testing.T) {
 			m := newTypingSessionModel(
-					model.Prompt{Content: helloWorldPrompt},
+				model.Prompt{Content: helloWorldPrompt},
 				false,
 				func() time.Time { return time.Unix(123, 0) },
 				false,
 				nil,
+				false,
 			)
 			gotModel, cmd := m.Update(tea.KeyMsg{Type: key})
 			updated := gotModel.(*typingSessionModel)
@@ -345,6 +361,7 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
 	)
 	m.wordIndex = 1
 	m.current = "w"
@@ -365,6 +382,7 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
 	)
 	m.wordIndex = 0
 	m.current = "hello"
@@ -379,31 +397,63 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 func TestFormatReplaySessionLabel(t *testing.T) {
 	t.Setenv("TZ", "UTC")
 	ts := time.Date(2026, 4, 30, 12, 4, 5, 0, time.UTC)
+	const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	if got := formatReplaySessionLabel(&model.SessionResult{ID: ulid, StartedAt: ts}); got != ulid {
+		t.Fatalf("prefer id: got %q want %q", got, ulid)
+	}
 	if got, want := formatReplaySessionLabel(&model.SessionResult{StartedAt: ts}), "2026-04-30 12:04:05"; got != want {
-		t.Fatalf("StartedAt: got %q want %q", got, want)
+		t.Fatalf("no id, use StartedAt: got %q want %q", got, want)
 	}
 	if formatReplaySessionLabel(nil) != "" {
 		t.Fatal("nil session")
 	}
+	if formatReplaySessionLabel(&model.SessionResult{}) != "" {
+		t.Fatal("no id and no StartedAt should yield empty label")
+	}
 }
 
-func TestViewReplayTitleUsesShortSessionLabel(t *testing.T) {
+func TestViewReplayTitleShowsSessionID(t *testing.T) {
 	t.Setenv("TZ", "UTC")
+	const sid = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	m := newTypingSessionModel(
 		model.Prompt{Content: "a b"},
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		&model.SessionResult{
-			ID:        "",
+			ID:        sid,
 			StartedAt: time.Date(2026, 4, 30, 12, 4, 5, 0, time.UTC),
 			Metrics:   model.SessionMetrics{NetWPM: 10, Accuracy: 90, Errors: 0},
 			ElapsedMS: 1000,
 		},
+		true,
 	)
 	v := m.View()
-	if !strings.Contains(v, "Replay · 2026-04-30 12:04:05") {
-		t.Fatalf("expected short label in view, got:\n%s", v)
+	want := "Replay · " + sid
+	if !strings.Contains(v, want) {
+		t.Fatalf("expected %q in view, got:\n%s", want, v)
+	}
+}
+
+func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "a b"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{
+			TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}},
+			StartedAt:   time.Date(2026, 4, 30, 12, 4, 5, 0, time.UTC),
+			Metrics:     model.SessionMetrics{NetWPM: 99, Accuracy: 100, Errors: 0},
+		},
+		false,
+	)
+	v := m.View()
+	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
+		t.Fatalf("ghost-only session should not show replay chrome, got:\n%s", v)
+	}
+	if !strings.Contains(v, "Guide: Type the current word") {
+		t.Fatal("expected normal start guide line")
 	}
 }
 

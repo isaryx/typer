@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -243,5 +244,87 @@ func TestHistoryStoreNthNewest(t *testing.T) {
 	}
 	if _, err := store.NthNewest(10); err == nil {
 		t.Fatal("expected error for out-of-range nth")
+	}
+}
+
+func TestHistoryStoreSessionsWithContentHash(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	h := model.PromptContentHash("same text")
+	if err := store.Append(model.SessionResult{
+		ID:          "a",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: "same text"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "b",
+		ContentHash: "",
+		Prompt:      model.Prompt{Content: "same text"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "c",
+		ContentHash: model.PromptContentHash("other"),
+		Prompt:      model.Prompt{Content: "other"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := store.SessionsWithContentHash(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("want 2 sessions, got %d", len(list))
+	}
+}
+
+func TestHistoryStoreBestSessionForGhost(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	text := "ghost pick"
+	h := model.PromptContentHash(text)
+	trace := []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "a"}}
+
+	if err := store.Append(model.SessionResult{
+		ID:          "weak",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: text},
+		TypingTrace: trace,
+		Metrics:     model.SessionMetrics{NetWPM: 30},
+		StartedAt:   time.Unix(100, 0),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "best",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: text},
+		TypingTrace: trace,
+		Metrics:     model.SessionMetrics{NetWPM: 80},
+		StartedAt:   time.Unix(200, 0),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "no_trace",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: text},
+		TypingTrace: nil,
+		Metrics:     model.SessionMetrics{NetWPM: 999},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.BestSessionForGhost(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "best" {
+		t.Fatalf("want best id, got %q", got.ID)
+	}
+
+	if _, err := store.BestSessionForGhost(model.PromptContentHash("unknown")); !errors.Is(err, ErrNoGhostCandidate) {
+		t.Fatalf("want ErrNoGhostCandidate, got %v", err)
 	}
 }

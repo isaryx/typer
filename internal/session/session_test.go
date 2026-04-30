@@ -75,6 +75,10 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 	if got.TypedText != "hello" {
 		t.Fatalf("TypedText = %q, want hello", got.TypedText)
 	}
+	wantHash := model.PromptContentHash(prompt.Content)
+	if got.ContentHash != wantHash {
+		t.Fatalf("ContentHash = %q, want %q", got.ContentHash, wantHash)
+	}
 	if got.ElapsedMS <= 0 {
 		t.Fatalf("ElapsedMS = %d, want > 0", got.ElapsedMS)
 	}

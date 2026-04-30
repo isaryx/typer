@@ -14,6 +14,8 @@ import (
 type Runner struct {
 	Provider text.Provider
 	Now      func() time.Time
+	// GhostBaseline, if set, runs after the prompt is chosen and may return a session to use as replay ghost baseline (nil = none).
+	GhostBaseline func(ctx context.Context, prompt model.Prompt) (*model.SessionResult, error)
 }
 
 func NewRunner(provider text.Provider) *Runner {
@@ -23,7 +25,8 @@ func NewRunner(provider text.Provider) *Runner {
 	}
 }
 
-// replayBaseline, when non-nil, enables replay UI (previous run metrics) for the same prompt.
+// replayBaseline, when non-nil, comes from `typer replay` and enables replay header UI plus shadow trace.
+// GhostBaseline runs only when replayBaseline is nil; it supplies shadow trace without replay chrome.
 func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Reader, output io.Writer, replayBaseline *model.SessionResult) (model.SessionResult, error) {
 	prompt, err := r.Provider.Next(ctx, text.Constraints{
 		Words:  opts.Words,
@@ -33,7 +36,17 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		return model.SessionResult{}, err
 	}
 
-	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, replayBaseline)
+	showReplayUI := replayBaseline != nil
+	baseline := replayBaseline
+	if baseline == nil && r.GhostBaseline != nil {
+		b, err := r.GhostBaseline(ctx, prompt)
+		if err != nil {
+			return model.SessionResult{}, err
+		}
+		baseline = b
+	}
+
+	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, baseline, showReplayUI)
 	if err != nil {
 		return model.SessionResult{}, err
 	}
@@ -52,7 +65,8 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	typingTrace := append([]model.ReplayEvent(nil), tuiResult.TypingTrace...)
 
 	result := model.SessionResult{
-		ID:        newSessionID(startedAt),
+		ID:          newSessionID(startedAt),
+		ContentHash: model.PromptContentHash(prompt.Content),
 		StartedAt: startedAt.UTC(),
 		EndedAt:   endedAt.UTC(),
 		ElapsedMS: endedAt.Sub(startedAt).Milliseconds(),

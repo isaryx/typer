@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,9 @@ import (
 
 	"typer/internal/model"
 )
+
+// ErrNoGhostCandidate is returned when no completed session with a typing trace exists for the hash.
+var ErrNoGhostCandidate = errors.New("no session with typing trace for this prompt content")
 
 const historyVersion = 1
 
@@ -72,6 +76,50 @@ func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
 		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history", len(list))
 	}
 	return list[n-1], nil
+}
+
+// SessionsWithContentHash returns sessions whose stored or derived content hash equals hash.
+func (s *HistoryStore) SessionsWithContentHash(hash string) ([]model.SessionResult, error) {
+	h, err := s.read()
+	if err != nil {
+		return nil, err
+	}
+	if hash == "" {
+		return nil, nil
+	}
+	var out []model.SessionResult
+	for _, sess := range h.Sessions {
+		if model.SessionContentHashKey(sess) == hash {
+			out = append(out, sess)
+		}
+	}
+	return out, nil
+}
+
+// BestSessionForGhost picks the strongest prior run for shadow replay: non-aborted, has TypingTrace,
+// best by model.BetterGhostCandidate among sessions matching the content hash.
+func (s *HistoryStore) BestSessionForGhost(hash string) (model.SessionResult, error) {
+	sessions, err := s.SessionsWithContentHash(hash)
+	if err != nil {
+		return model.SessionResult{}, err
+	}
+	var candidates []model.SessionResult
+	for _, sess := range sessions {
+		if sess.Aborted || len(sess.TypingTrace) == 0 {
+			continue
+		}
+		candidates = append(candidates, sess)
+	}
+	if len(candidates) == 0 {
+		return model.SessionResult{}, ErrNoGhostCandidate
+	}
+	best := candidates[0]
+	for _, c := range candidates[1:] {
+		if model.BetterGhostCandidate(c, best) {
+			best = c
+		}
+	}
+	return best, nil
 }
 
 func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {
