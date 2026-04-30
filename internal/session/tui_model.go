@@ -19,6 +19,12 @@ import (
 // readable (roughly 65–95 characters is a common prose band; 88 matches e.g. rustfmt).
 const maxWrapWidth = 88
 
+// Caret markers are Unicode combining characters (overlay on the glyph; base letter keeps passage color).
+const (
+	markUserCaret  = "\u0332" // COMBINING UNDERLINE LOW LINE — bar below
+	markGhostCaret = "\u0305" // COMBINING OVERLINE — bar above
+)
+
 type shadowTickMsg struct{}
 
 type typingSessionResult struct {
@@ -169,23 +175,13 @@ func (m *typingSessionModel) View() string {
 	tw := m.wrapWidth()
 	var b strings.Builder
 	if m.replay != nil {
-		b.WriteString(m.styles.title.Width(tw).Render("Replay — type the same text again"))
+		replayTitle := "Replay"
+		if m.replay.ID != "" {
+			replayTitle = fmt.Sprintf("Replay · %s", m.replay.ID)
+		}
+		b.WriteString(m.styles.title.Width(tw).Render(replayTitle))
 		b.WriteString("\n")
 		b.WriteString(m.styles.meta.Width(tw).Render(formatReplaySummary(m.replay)))
-		b.WriteString("\n\n")
-	}
-	if m.hasShadowReplay() {
-		b.WriteString(m.styles.meta.Width(tw).Render("Shadow — previous typing (timed replay)"))
-		b.WriteString("\n")
-		if m.replayClockStart.IsZero() {
-			b.WriteString(m.styles.meta.Width(tw).Render("Starts when you type your first character (synced with your run)."))
-			b.WriteString("\n")
-		}
-		sprompt := m.renderShadowWords(m.promptInnerWidth())
-		b.WriteString(m.styles.promptBox.Width(tw).Render(sprompt))
-		b.WriteString("\n")
-		b.WriteString("> ")
-		b.WriteString(m.renderShadowInputWord())
 		b.WriteString("\n\n")
 	}
 	b.WriteString(m.styles.title.Width(tw).Render("Guide: Type the current word, then press Space to advance"))
@@ -206,7 +202,7 @@ func (m *typingSessionModel) View() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	prompt := m.renderWords(m.promptInnerWidth())
+	prompt := m.renderMergedWords(m.promptInnerWidth())
 	b.WriteString(m.styles.promptBox.Width(tw).Render(prompt))
 	b.WriteString("\n\n")
 	b.WriteString("> ")
@@ -295,6 +291,122 @@ func (m *typingSessionModel) renderWords(lineWidth int) string {
 	return strings.Join(lines, "\n")
 }
 
+// renderMergedWords draws user + ghost on the same passage; without a trace it matches renderWords.
+func (m *typingSessionModel) renderMergedWords(lineWidth int) string {
+	if lineWidth < 1 {
+		lineWidth = 1
+	}
+	if !m.hasShadowReplay() {
+		return m.renderWords(lineWidth)
+	}
+	var lines []string
+	var parts []string
+	cur := 0
+	for i, w := range m.words {
+		seg := m.renderMergedWordPiece(i, w)
+		sw := lipgloss.Width(seg)
+		sep := 0
+		if len(parts) > 0 {
+			sep = 1
+		}
+		if cur+sep+sw > lineWidth && len(parts) > 0 {
+			lines = append(lines, strings.Join(parts, " "))
+			parts = nil
+			cur = 0
+			sep = 0
+		}
+		if len(parts) > 0 {
+			cur++
+		}
+		parts = append(parts, seg)
+		cur += sw
+	}
+	if len(parts) > 0 {
+		lines = append(lines, strings.Join(parts, " "))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *typingSessionModel) renderMergedWordPiece(i int, w string) string {
+	if !m.hasShadowReplay() {
+		return m.renderWordPiece(i, w)
+	}
+
+	uAct := i == m.wordIndex
+	gAct := i == m.shadowWordIndex
+
+	// User finished word i only when their caret moved on *and* the ghost is not still
+	// typing this word. If i < wordIndex but shadowWordIndex == i, the user committed
+	// ahead of the ghost — we must keep showing the ghost here (otherwise the overline
+	// vanishes until the shadow catches up).
+	if i < m.wordIndex && m.shadowWordIndex != i {
+		return m.renderWordPiece(i, w)
+	}
+	if uAct && gAct {
+		return m.renderMergedActiveWord(w)
+	}
+	if uAct && m.shadowWordIndex > i {
+		return m.renderMergedActiveGhostCommitted(w, i)
+	}
+	if uAct {
+		return m.renderActiveWord(w)
+	}
+	if i < m.shadowWordIndex && m.wordIndex < i {
+		return m.renderGhostCompletedAt(i, w)
+	}
+	if gAct {
+		return m.renderShadowActiveWord(w)
+	}
+	return m.styles.upcoming.Render(w)
+}
+
+// Both on the same word: only combining marks differ by column; rune styling does not depend on ghost position.
+func (m *typingSessionModel) renderMergedActiveWord(target string) string {
+	tu := []rune(target)
+	cu := len([]rune(m.current))
+	cg := len([]rune(m.shadowCurrent))
+	if len(tu) == 0 {
+		return m.styles.active.Render(target)
+	}
+	// Do not delegate to renderActiveWord when cu >= len(tu): that path omits the ghost
+	// overline while the user has finished the runes but not yet pressed Space.
+	displayCG := cg
+	if displayCG >= len(tu) {
+		displayCG = len(tu) - 1
+	}
+	userCol := cu
+	if cu >= len(tu) {
+		userCol = len(tu) - 1
+	}
+	var b strings.Builder
+	for j := 0; j < len(tu); j++ {
+		ch := string(tu[j])
+		marks := ""
+		if j == userCol {
+			marks += markUserCaret
+		}
+		if j == displayCG {
+			marks += markGhostCaret
+		}
+		if j < cu {
+			b.WriteString(m.styles.activeTyped.Render(ch + marks))
+		} else {
+			b.WriteString(m.styles.activePlain.Render(ch + marks))
+		}
+	}
+	return b.String()
+}
+
+// User still typing a word the ghost has already finished — prompt stays target-only (same as a normal active word for user).
+func (m *typingSessionModel) renderMergedActiveGhostCommitted(target string, _ int) string {
+	return m.renderActiveWord(target)
+}
+
+func (m *typingSessionModel) renderGhostCompletedAt(_ int, w string) string {
+	// Ghost progress does not change passage styling — looks like any word not yet reached.
+	return m.styles.upcoming.Render(w)
+}
+
 func (m *typingSessionModel) renderActiveWord(target string) string {
 	targetRunes := []rune(target)
 	if len(targetRunes) == 0 {
@@ -310,9 +422,13 @@ func (m *typingSessionModel) renderActiveWord(target string) string {
 	if cursor > 0 {
 		b.WriteString(m.styles.activeTyped.Render(string(targetRunes[:cursor])))
 	}
-	b.WriteString(m.styles.activeCursor.Render(string(targetRunes[cursor])))
-	if cursor+1 < len(targetRunes) {
-		b.WriteString(m.styles.active.Render(string(targetRunes[cursor+1:])))
+	for j := cursor; j < len(targetRunes); j++ {
+		ch := string(targetRunes[j])
+		marks := ""
+		if j == cursor {
+			marks = markUserCaret
+		}
+		b.WriteString(m.styles.activePlain.Render(ch + marks))
 	}
 	return b.String()
 }
@@ -358,103 +474,26 @@ func (m *typingSessionModel) hasShadowReplay() bool {
 	return len(m.shadowTrace) > 0
 }
 
-func (m *typingSessionModel) renderShadowWordPiece(i int, w string) string {
-	switch {
-	case i < m.shadowWordIndex:
-		if i < len(m.shadowWordMatches) && !m.shadowWordMatches[i] {
-			return m.styles.ghostCompletedBad.Render(w)
-		}
-		return m.styles.ghostCompleted.Render(w)
-	case i == m.shadowWordIndex:
-		return m.renderShadowActiveWord(w)
-	default:
-		return m.styles.ghostUpcoming.Render(w)
-	}
-}
-
+// Ghost alone on this word: identical styling on every rune; only the overline combining mark moves.
 func (m *typingSessionModel) renderShadowActiveWord(target string) string {
-	targetRunes := []rune(target)
-	if len(targetRunes) == 0 {
-		return m.styles.ghostActive.Render(target)
+	tu := []rune(target)
+	cg := len([]rune(m.shadowCurrent))
+	if len(tu) == 0 {
+		return m.styles.upcoming.Render(target)
 	}
-	cursor := utf8.RuneCountInString(m.shadowCurrent)
-	if cursor >= len(targetRunes) {
-		return m.styles.ghostActive.Render(target)
-	}
-	var b strings.Builder
-	if cursor > 0 {
-		b.WriteString(m.styles.ghostActiveTyped.Render(string(targetRunes[:cursor])))
-	}
-	b.WriteString(m.styles.ghostActiveCursor.Render(string(targetRunes[cursor])))
-	if cursor+1 < len(targetRunes) {
-		b.WriteString(m.styles.ghostActive.Render(string(targetRunes[cursor+1:])))
-	}
-	return b.String()
-}
-
-func (m *typingSessionModel) renderShadowWords(lineWidth int) string {
-	if lineWidth < 1 {
-		lineWidth = 1
-	}
-	var lines []string
-	var parts []string
-	cur := 0
-	for i, w := range m.words {
-		seg := m.renderShadowWordPiece(i, w)
-		sw := lipgloss.Width(seg)
-		sep := 0
-		if len(parts) > 0 {
-			sep = 1
-		}
-		if cur+sep+sw > lineWidth && len(parts) > 0 {
-			lines = append(lines, strings.Join(parts, " "))
-			parts = nil
-			cur = 0
-			sep = 0
-		}
-		if len(parts) > 0 {
-			cur++
-		}
-		parts = append(parts, seg)
-		cur += sw
-	}
-	if len(parts) > 0 {
-		lines = append(lines, strings.Join(parts, " "))
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (m *typingSessionModel) renderShadowInputWord() string {
-	if m.shadowWordIndex >= len(m.words) {
-		return m.styles.ghostInput.Render(m.shadowCurrent)
-	}
-	target := []rune(m.words[m.shadowWordIndex])
-	typed := []rune(m.shadowCurrent)
-	if len(typed) == 0 {
-		return ""
+	caret := cg
+	if caret >= len(tu) {
+		caret = len(tu) - 1
 	}
 	var b strings.Builder
-	runStart := 0
-	runBad := len(target) > 0 && typed[0] != target[0]
-	isBad := func(i int) bool {
-		return i < len(target) && typed[i] != target[i]
-	}
-	flush := func(end int) {
-		segment := string(typed[runStart:end])
-		if runBad {
-			b.WriteString(m.styles.ghostInputBad.Render(segment))
+	for j := 0; j < len(tu); j++ {
+		ch := string(tu[j])
+		if j == caret {
+			b.WriteString(m.styles.upcoming.Render(ch + markGhostCaret))
 		} else {
-			b.WriteString(m.styles.ghostInput.Render(segment))
+			b.WriteString(m.styles.upcoming.Render(ch))
 		}
 	}
-	for i := 1; i < len(typed); i++ {
-		if bad := isBad(i); bad != runBad {
-			flush(i)
-			runStart = i
-			runBad = bad
-		}
-	}
-	flush(len(typed))
 	return b.String()
 }
 

@@ -386,12 +386,14 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 		}
 	}
 	if len(finished) == 0 {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "No completed sessions.")
+		fmt.Fprintln(out, "\nSession aborted.")
 		return
 	}
 	if len(finished) == 1 {
 		printOneSessionResult(out, finished[0])
+		if len(results) > 0 && results[len(results)-1].Aborted {
+			fmt.Fprintln(out, "\nSession aborted.")
+		}
 		return
 	}
 	var sumGross, sumNet, sumAdjusted, sumAcc, sumCons float64
@@ -413,6 +415,9 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 	avgAcc := sumAcc / n
 	avgCons := sumCons / n
 	printMetricsTable(out, fmt.Sprintf("Summary (%d completed sessions)", len(finished)), avgGross, avgNet, avgAdjusted, avgAcc, avgCons, sumErr, sumElapsed, true)
+	if len(results) > 0 && results[len(results)-1].Aborted {
+		fmt.Fprintln(out, "\nSession aborted.")
+	}
 }
 
 func printOneSessionResult(out io.Writer, r model.SessionResult) {
@@ -675,7 +680,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  start        Run an interactive typing session.")
 	fmt.Fprintln(out, "  set          Save custom words and/or passages file paths.")
 	fmt.Fprintln(out, "  history      List recent sessions from local history.")
-	fmt.Fprintln(out, "  replay       Re-type a past session (same text) and compare metrics.")
+	fmt.Fprintln(out, "  replay       Replay a session from history (--last, --nth, --id) and compare metrics.")
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
 	fmt.Fprintln(out, "  credits      Show data source credits.")
 	fmt.Fprintln(out, "  key-press    Show key presses.")
@@ -769,9 +774,9 @@ func printStatsHelp(out io.Writer) {
 }
 
 func printReplayHelp(out io.Writer) {
-	fmt.Fprintln(out, "Re-type the same passage as a stored session and compare speed to your previous run.")
-	fmt.Fprintln(out, "When the session was saved with a typing trace, a dim \"shadow\" replays the")
-	fmt.Fprintln(out, "previous keystrokes in real time (same timing) while you type again below.")
+	fmt.Fprintln(out, "Replay a session chosen with --last, --nth, or --id (session ids are listed by typer history).")
+	fmt.Fprintln(out, "Your new run is compared to the saved result. When the session includes a typing trace,")
+	fmt.Fprintln(out, "a dim \"shadow\" replays the previous keystrokes in real time while you type below.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer replay --last")

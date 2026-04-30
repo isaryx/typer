@@ -336,6 +336,46 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 	}
 }
 
+func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
+	// Regression: i < wordIndex used to always paint completed styling, which hid the
+	// ghost on any word the user had committed but the shadow had not finished yet.
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+	)
+	m.wordIndex = 1
+	m.current = "w"
+	m.shadowWordIndex = 0
+	m.shadowCurrent = "hell"
+	s := m.renderMergedWordPiece(0, "hello")
+	if !strings.Contains(s, markGhostCaret) {
+		t.Fatalf("expected ghost mark on prior word: %q", s)
+	}
+}
+
+func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
+	// Regression: used to delegate to renderActiveWord when len(typed) == len(target),
+	// which dropped the ghost overline until Space (looked like the caret flickered off).
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+	)
+	m.wordIndex = 0
+	m.current = "hello"
+	m.shadowWordIndex = 0
+	m.shadowCurrent = "he"
+	s := m.renderMergedActiveWord("hello")
+	if !strings.Contains(s, markGhostCaret) {
+		t.Fatalf("expected ghost mark in merged render: %q", s)
+	}
+}
+
 func TestRemoveLastRune(t *testing.T) {
 	if got := removeLastRune(""); got != "" {
 		t.Fatalf("empty input: got %q", got)
