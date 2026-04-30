@@ -52,7 +52,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	typingTrace := append([]model.ReplayEvent(nil), tuiResult.TypingTrace...)
 
 	result := model.SessionResult{
-		ID:        startedAt.UTC().Format(time.RFC3339Nano),
+		ID:        newSessionID(startedAt),
 		StartedAt: startedAt.UTC(),
 		EndedAt:   endedAt.UTC(),
 		ElapsedMS: endedAt.Sub(startedAt).Milliseconds(),

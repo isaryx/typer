@@ -230,6 +230,9 @@ func TestExecuteCredits(t *testing.T) {
 	if !strings.Contains(stdout.String(), "type.fit") {
 		t.Fatalf("expected quote API credit in output, got %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "oklog/ulid") {
+		t.Fatalf("expected ULID library credit in output, got %q", stdout.String())
+	}
 }
 
 func TestExecuteUnknownCommand(t *testing.T) {

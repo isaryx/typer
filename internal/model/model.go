@@ -74,7 +74,7 @@ type SessionMetrics struct {
 }
 
 type SessionResult struct {
-	ID        string         `json:"id"`
+	ID string `json:"id"` // ULID (new sessions); legacy entries may use RFC3339Nano or other strings
 	StartedAt time.Time      `json:"started_at"`
 	EndedAt   time.Time      `json:"ended_at"`
 	ElapsedMS int64          `json:"elapsed_ms"`

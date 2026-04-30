@@ -176,8 +176,8 @@ func (m *typingSessionModel) View() string {
 	var b strings.Builder
 	if m.replay != nil {
 		replayTitle := "Replay"
-		if m.replay.ID != "" {
-			replayTitle = fmt.Sprintf("Replay · %s", formatReplaySessionLabel(m.replay.ID))
+		if label := formatReplaySessionLabel(m.replay); label != "" {
+			replayTitle = fmt.Sprintf("Replay · %s", label)
 		}
 		b.WriteString(m.styles.title.Width(tw).Render(replayTitle))
 		b.WriteString("\n")
@@ -688,22 +688,16 @@ func (m *typingSessionModel) result() typingSessionResult {
 	}
 }
 
-// formatReplaySessionLabel shortens a stored session id (RFC3339Nano) for the header;
-// other ids are truncated if very long.
-func formatReplaySessionLabel(id string) string {
-	if id == "" {
+// formatReplaySessionLabel picks a short datetime for the replay header;
+// it prefers StartedAt (works for ULID ids), then legacy id encodings.
+func formatReplaySessionLabel(sr *model.SessionResult) string {
+	if sr == nil {
 		return ""
 	}
-	if t, err := time.Parse(time.RFC3339Nano, id); err == nil {
-		return t.Local().Format("2006-01-02 15:04:05")
+	if !sr.StartedAt.IsZero() {
+		return sr.StartedAt.Local().Format("2006-01-02 15:04:05")
 	}
-	if t, err := time.Parse(time.RFC3339, id); err == nil {
-		return t.Local().Format("2006-01-02 15:04:05")
-	}
-	if len(id) > 36 {
-		return id[:33] + "…"
-	}
-	return id
+	return formatSessionIDForDisplay(sr.ID)
 }
 
 func formatReplaySummary(prev *model.SessionResult) string {

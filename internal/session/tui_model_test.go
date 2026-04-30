@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -379,18 +378,12 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 
 func TestFormatReplaySessionLabel(t *testing.T) {
 	t.Setenv("TZ", "UTC")
-	if got, want := formatReplaySessionLabel("2026-04-30T12:04:05.123456789Z"), "2026-04-30 12:04:05"; got != want {
-		t.Fatalf("RFC3339Nano: got %q want %q", got, want)
+	ts := time.Date(2026, 4, 30, 12, 4, 5, 0, time.UTC)
+	if got, want := formatReplaySessionLabel(&model.SessionResult{StartedAt: ts}), "2026-04-30 12:04:05"; got != want {
+		t.Fatalf("StartedAt: got %q want %q", got, want)
 	}
-	if got, want := formatReplaySessionLabel("2026-04-30T12:04:05Z"), "2026-04-30 12:04:05"; got != want {
-		t.Fatalf("RFC3339: got %q want %q", got, want)
-	}
-	long := strings.Repeat("x", 40)
-	if got := formatReplaySessionLabel(long); !strings.HasSuffix(got, "…") || utf8.RuneCountInString(got) != 34 {
-		t.Fatalf("truncate non-time id: %q (runes=%d)", got, utf8.RuneCountInString(got))
-	}
-	if formatReplaySessionLabel("") != "" {
-		t.Fatal("empty id")
+	if formatReplaySessionLabel(nil) != "" {
+		t.Fatal("nil session")
 	}
 }
 
@@ -402,7 +395,8 @@ func TestViewReplayTitleUsesShortSessionLabel(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		&model.SessionResult{
-			ID:        "2026-04-30T12:04:05.000000000Z",
+			ID:        "",
+			StartedAt: time.Date(2026, 4, 30, 12, 4, 5, 0, time.UTC),
 			Metrics:   model.SessionMetrics{NetWPM: 10, Accuracy: 90, Errors: 0},
 			ElapsedMS: 1000,
 		},

@@ -41,7 +41,11 @@ const creditsMessage = `Data Credits
 - Quotes mode bundled list (assets/quotes.json): curated from dwyl/quotes
 - Optional remote quote API source (when --source=remote): https://type.fit/api/quotes
 
-See README "Data Credits" for details and usage notes.
+Libraries
+---------
+- Session identifiers (ULID): github.com/oklog/ulid/v2 — https://github.com/oklog/ulid (Apache-2.0)
+
+See README "Credits" for bundled content notes and library links.
 `
 
 var newHistoryStore = storage.NewHistoryStore

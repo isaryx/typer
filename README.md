@@ -64,8 +64,10 @@ Session history and settings stay on your machine (for example under `~/.config/
 
 ## Credits
 
-UI: [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT).
+**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT).
 
-Bundled words list from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages built from public-domain proverbs (details in `assets/PASSAGES_CREDITS.md`). Quotes mode can use [type.fit](https://type.fit/api/quotes) or bundled seed data.
+**Session IDs (ULID):** [oklog/ulid](https://github.com/oklog/ulid) — Go package [`github.com/oklog/ulid/v2`](https://pkg.go.dev/github.com/oklog/ulid/v2), Apache License 2.0. ([ULID specification](https://github.com/ulid/spec).)
+
+**Bundled content:** Words list from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages built from public-domain proverbs (details in `assets/PASSAGES_CREDITS.md`). Quotes mode can use [type.fit](https://type.fit/api/quotes) or bundled seed data.
 
 Scoring formulas and edge cases live in `internal/scoring/scoring.go`.

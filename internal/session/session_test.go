@@ -12,6 +12,8 @@ import (
 	"typer/internal/model"
 	"typer/internal/text"
 	"typer/internal/version"
+
+	"github.com/oklog/ulid/v2"
 )
 
 type fakeProvider struct {
@@ -79,8 +81,12 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 	if !got.EndedAt.After(got.StartedAt) {
 		t.Fatalf("expected EndedAt > StartedAt, got %v <= %v", got.EndedAt, got.StartedAt)
 	}
-	if got.ID != got.StartedAt.UTC().Format(time.RFC3339Nano) {
-		t.Fatalf("ID = %q, want %q", got.ID, got.StartedAt.UTC().Format(time.RFC3339Nano))
+	u, err := ulid.ParseStrict(got.ID)
+	if err != nil {
+		t.Fatalf("ID should be a ULID: %v", err)
+	}
+	if u.Timestamp().UnixMilli() != got.StartedAt.UTC().UnixMilli() {
+		t.Fatalf("ULID embedded time %v != StartedAt (ms) %v", u.Timestamp().UnixMilli(), got.StartedAt.UTC().UnixMilli())
 	}
 	if got.Metrics.Accuracy != 100 {
 		t.Fatalf("Accuracy = %.2f, want 100", got.Metrics.Accuracy)
