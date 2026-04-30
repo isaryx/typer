@@ -330,7 +330,9 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	fs.SetOutput(io.Discard)
 	id := fs.String("id", "", "Session id (from `typer history`, id=...).")
 	nth := fs.Int("nth", 0, "Replay the n-th newest session (1 = most recent).")
-	last := fs.Bool("last", false, "Replay the most recent session.")
+	var last bool
+	fs.BoolVar(&last, "last", false, "Replay the most recent session.")
+	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printReplayHelp(stdout)
@@ -345,14 +347,14 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	var useID string
 	var nSelect int
 	switch {
-	case *last:
+	case last:
 		nSelect = 1
 	case *nth > 0:
 		nSelect = *nth
 	case strings.TrimSpace(*id) != "":
 		useID = strings.TrimSpace(*id)
 	default:
-		return errors.New("replay requires --last, --nth N, or --id ID (see: typer replay -h)")
+		return errors.New("replay requires -l/--last, --nth N, or --id ID (see: typer replay -h)")
 	}
 
 	store, err := newHistoryStore()
@@ -757,7 +759,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  start        Run an interactive typing session.")
 	fmt.Fprintln(out, "  set          Save custom words and/or passages file paths.")
 	fmt.Fprintln(out, "  history      List recent sessions from local history.")
-	fmt.Fprintln(out, "  replay       Replay a session from history (--last, --nth, --id) and compare metrics.")
+	fmt.Fprintln(out, "  replay       Re-run a history session; compare metrics (-l, --nth, --id).")
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
 	fmt.Fprintln(out, "  credits      Show data source credits.")
 	fmt.Fprintln(out, "  key-press    Show key presses.")
@@ -768,7 +770,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--no-ghost]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
-	fmt.Fprintln(out, "  typer replay --last | --nth N | --id ID")
+	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID")
 	fmt.Fprintln(out, "  typer stats [--last N]")
 	fmt.Fprintln(out, "  typer credits")
 	fmt.Fprintln(out, "  typer key-press")
@@ -853,18 +855,16 @@ func printStatsHelp(out io.Writer) {
 }
 
 func printReplayHelp(out io.Writer) {
-	fmt.Fprintln(out, "Replay a session chosen with --last, --nth, or --id (session ids are listed by typer history).")
-	fmt.Fprintln(out, "Your new run is compared to the saved result. When the session includes a typing trace,")
-	fmt.Fprintln(out, "a dim \"shadow\" replays the previous keystrokes in real time while you type below.")
-	fmt.Fprintln(out, "Sessions without a trace (e.g. saved before traces existed) still replay the text; a note is printed.")
+	fmt.Fprintln(out, "Re-run a session from local history (`typer history` lists ids). Your run is scored against the saved one.")
+	fmt.Fprintln(out, "With a typing trace, a dim shadow replays the old keystrokes above your input; without one you get a short note.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer replay --last")
-	fmt.Fprintln(out, "  typer replay --nth N      # 1 = most recent (same order as typer history)")
-	fmt.Fprintln(out, "  typer replay --id SESSION_ID")
+	fmt.Fprintln(out, "  typer replay -l")
+	fmt.Fprintln(out, "  typer replay --nth N   # 1 = newest, same order as typer history")
+	fmt.Fprintln(out, "  typer replay --id ID")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "      --last       Pick the most recent session.")
-	fmt.Fprintln(out, "      --nth int    Pick the n-th newest session (1 = newest).")
-	fmt.Fprintln(out, "      --id string  Exact session id from `typer history` (id=...).")
+	fmt.Fprintln(out, "  -l, --last      Most recent session.")
+	fmt.Fprintln(out, "      --nth int   N-th newest session (1 = newest).")
+	fmt.Fprintln(out, "      --id string Session id from history (id=... line).")
 }

@@ -693,7 +693,8 @@ func TestHelpPrintersIncludeUsage(t *testing.T) {
 		var out bytes.Buffer
 		printReplayHelp(&out)
 		got := out.String()
-		if !strings.Contains(got, "typer replay") || !strings.Contains(got, "--nth") {
+		if !strings.Contains(got, "typer replay") || !strings.Contains(got, "--nth") ||
+			!strings.Contains(got, "-l, --last") {
 			t.Fatalf("unexpected replay help: %q", got)
 		}
 	})
