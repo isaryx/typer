@@ -1,6 +1,7 @@
 package keypress
 
 import (
+	"context"
 	"io"
 	"strings"
 
@@ -115,10 +116,11 @@ func (m keyPressModel) View() string {
 	return lipgloss.Place(tw, th, lipgloss.Center, lipgloss.Center, stack)
 }
 
-// RunKeyPress runs the full-screen key display until Ctrl+C.
-func RunKeyPress(input io.Reader, output io.Writer) error {
+// RunKeyPress runs the full-screen key display until Ctrl+C or ctx cancellation.
+func RunKeyPress(ctx context.Context, input io.Reader, output io.Writer) error {
 	p := tea.NewProgram(
 		newKeyPressModel(),
+		tea.WithContext(ctx),
 		tea.WithInput(input),
 		tea.WithOutput(output),
 		tea.WithAltScreen(),

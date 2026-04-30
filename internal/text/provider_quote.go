@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand/v2"
 	"net/http"
 	"strings"
@@ -20,10 +19,10 @@ import (
 const typeFitURL = "https://type.fit/api/quotes"
 const defaultRemoteQuoteLimit = 250
 const (
-	quoteSourceAuto   = "auto"
-	quoteSourceRemote = "remote"
-	quoteSourceCache  = "cache"
-	quoteSourceSeed   = "seed"
+	quoteSourceAuto    = "auto"
+	quoteSourceRemote  = "remote"
+	quoteSourceCache   = "cache"
+	quoteSourceSeed    = "seed"
 	quoteSourceTypeFit = "type.fit"
 )
 
@@ -178,9 +177,7 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 	if len(quotes) == 0 {
 		return nil, errors.New("remote quote API returned empty payload")
 	}
-	if err := p.cache.Save(quotes); err != nil {
-		log.Printf("typer: failed to save quote cache: %v", err)
-	}
+	_ = p.cache.Save(quotes)
 	return quotes, nil
 }
 

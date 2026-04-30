@@ -78,9 +78,9 @@ func TestBuildSummaryDeterministicAveragesAndCharBuckets(t *testing.T) {
 	if s.AvgErrors != 1 {
 		t.Fatalf("AvgErrors = %.2f, want 1.00", s.AvgErrors)
 	}
-	wantConsistency := scoring.ConsistencyFromSamples([]float64{40, 60, 25, 80})
-	if s.ConsistencyTrend != wantConsistency {
-		t.Fatalf("ConsistencyTrend = %.2f, want %.2f", s.ConsistencyTrend, wantConsistency)
+	wantStability := scoring.ConsistencyFromSamples([]float64{40, 60, 25, 80})
+	if s.NetWPMStability != wantStability {
+		t.Fatalf("NetWPMStability = %.2f, want %.2f", s.NetWPMStability, wantStability)
 	}
 
 	if len(s.TopErrorChars) != 3 {

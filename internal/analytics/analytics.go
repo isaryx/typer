@@ -14,13 +14,16 @@ type CharCount struct {
 }
 
 type Summary struct {
-	Sessions          int
-	AvgGrossWPM       float64
-	AvgNetWPM         float64
-	AvgAdjustedWPM    float64
-	AvgAccuracy       float64
-	AvgErrors         float64
-	ConsistencyTrend  float64
+	Sessions int
+	AvgGrossWPM,
+	AvgNetWPM,
+	AvgAdjustedWPM,
+	AvgAccuracy,
+	AvgErrors float64
+	// NetWPMStability is scoring.ConsistencyFromSamples applied to each session's
+	// final Net WPM (one value per session). This differs from SessionMetrics.Consistency
+	// after a run, which uses in-session gross-WPM samples (pace within one passage).
+	NetWPMStability   float64
 	TopErrorChars     []CharCount
 	TopMissingChars   []CharCount
 	TopUnexpectedChar []CharCount
@@ -56,7 +59,7 @@ func BuildSummary(sessions []model.SessionResult, topN int) Summary {
 	out.AvgAdjustedWPM = scoring.Round2(out.AvgAdjustedWPM / n)
 	out.AvgAccuracy = scoring.Round2(out.AvgAccuracy / n)
 	out.AvgErrors = scoring.Round2(out.AvgErrors / n)
-	out.ConsistencyTrend = scoring.ConsistencyFromSamples(netSamples)
+	out.NetWPMStability = scoring.ConsistencyFromSamples(netSamples)
 	out.TopErrorChars = topCounts(errorMap, topN)
 	out.TopMissingChars = topCounts(missingMap, topN)
 	out.TopUnexpectedChar = topCounts(extraMap, topN)

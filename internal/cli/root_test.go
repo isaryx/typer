@@ -382,11 +382,11 @@ func TestPrintMetricsTableIncludesConsistencyWhenZero(t *testing.T) {
 	var out bytes.Buffer
 	printMetricsTable(&out, "Session result", 50.0, 45.0, 40.0, 90.0, 0, 2, 8_000, false)
 	got := out.String()
-	if !strings.Contains(got, "Consistency") {
-		t.Fatalf("expected Consistency row, got %q", got)
+	if !strings.Contains(got, "Pace stability") {
+		t.Fatalf("expected Pace stability row, got %q", got)
 	}
 	if !strings.Contains(got, "0.00") {
-		t.Fatalf("expected zero consistency value, got %q", got)
+		t.Fatalf("expected zero pace stability value, got %q", got)
 	}
 }
 

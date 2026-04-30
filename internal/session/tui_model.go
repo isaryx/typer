@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -380,7 +381,7 @@ func (m typingSessionModel) result() typingSessionResult {
 	}
 }
 
-func runTypingSession(input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time) (typingSessionResult, error) {
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time) (typingSessionResult, error) {
 	m := newTypingSessionModel(prompt, strict, now, indefinite)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
@@ -391,6 +392,7 @@ func runTypingSession(input io.Reader, output io.Writer, prompt model.Prompt, st
 
 	p := tea.NewProgram(
 		m,
+		tea.WithContext(ctx),
 		tea.WithInput(input),
 		tea.WithOutput(output),
 	)

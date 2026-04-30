@@ -112,7 +112,7 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	case "credits":
 		return runCredits(stdout)
 	case "key-press":
-		return runKeyPress(args[1:], stdin, stdout)
+		return runKeyPress(ctx, args[1:], stdin, stdout)
 	case "version", "--version", "-v":
 		return runVersion(stdout)
 	case resetProgressFlag:
@@ -352,7 +352,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 		fmt.Fprintf(out, boxInnerFmt, "")
 		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg gross WPM", fmt.Sprintf("%.2f", gross), "Avg accuracy", fmt.Sprintf("%.2f%%", acc)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg net WPM", fmt.Sprintf("%.2f", net), "Avg consistency", fmt.Sprintf("%.2f", cons)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg net WPM", fmt.Sprintf("%.2f", net), "Avg pace stability", fmt.Sprintf("%.2f", cons)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Total errors", fmt.Sprintf("%d", errCount)))
 		fmt.Fprintf(out, boxInnerFmt, "")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Total time: %s", formatElapsedMS(elapsedMS)))
@@ -362,7 +362,7 @@ func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 		fmt.Fprintf(out, boxInnerFmt, "")
 		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Gross WPM", fmt.Sprintf("%.2f", gross), "Accuracy", fmt.Sprintf("%.2f%%", acc)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Net WPM", fmt.Sprintf("%.2f", net), "Consistency", fmt.Sprintf("%.2f", cons)))
+		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Net WPM", fmt.Sprintf("%.2f", net), "Pace stability", fmt.Sprintf("%.2f", cons)))
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Errors", fmt.Sprintf("%d", errCount)))
 		fmt.Fprintf(out, boxInnerFmt, "")
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Duration: %s", formatElapsedMS(elapsedMS)))
@@ -552,7 +552,7 @@ func runStats(args []string, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "Avg Adjusted WPM  : %.2f\n", sum.AvgAdjustedWPM)
 	fmt.Fprintf(stdout, "Avg Accuracy      : %.2f%%\n", sum.AvgAccuracy)
 	fmt.Fprintf(stdout, "Avg Errors        : %.2f\n", sum.AvgErrors)
-	fmt.Fprintf(stdout, "Consistency Trend : %.2f\n", sum.ConsistencyTrend)
+	fmt.Fprintf(stdout, "Net WPM stability (across sessions): %.2f\n", sum.NetWPMStability)
 	printCharCounts(stdout, "Top Mistyped Target Characters", sum.TopErrorChars)
 	printCharCounts(stdout, "Top Missing Target Characters", sum.TopMissingChars)
 	printCharCounts(stdout, "Top Unexpected Typed Characters", sum.TopUnexpectedChar)
@@ -620,7 +620,7 @@ func printKeyPressHelp(out io.Writer) {
 	fmt.Fprintln(out, "Press Ctrl+C to quit.")
 }
 
-func runKeyPress(args []string, stdin io.Reader, stdout io.Writer) error {
+func runKeyPress(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	for _, a := range args {
 		if a == "-h" || a == "--help" {
 			printKeyPressHelp(stdout)
@@ -630,7 +630,7 @@ func runKeyPress(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := rejectExtraArgs("key-press", args); err != nil {
 		return err
 	}
-	return keypress.RunKeyPress(stdin, stdout)
+	return keypress.RunKeyPress(ctx, stdin, stdout)
 }
 
 func printStartHelp(out io.Writer) {
