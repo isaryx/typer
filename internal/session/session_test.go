@@ -11,6 +11,7 @@ import (
 
 	"typer/internal/model"
 	"typer/internal/text"
+	"typer/internal/version"
 )
 
 type fakeProvider struct {
@@ -49,10 +50,12 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 		return base.Add(time.Duration(calls) * time.Second)
 	}
 
+	wantOpts := model.SessionOptions{Mode: model.ModeWords}
+
 	var out bytes.Buffer
 	got, err := r.Run(
 		context.Background(),
-		model.SessionOptions{Mode: model.ModeWords},
+		wantOpts,
 		strings.NewReader("hello "),
 		&out,
 	)
@@ -89,6 +92,24 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 	}
 	if got.Metrics.Consistency != 100 {
 		t.Fatalf("expected 100 consistency with <=1 sample, got %.2f", got.Metrics.Consistency)
+	}
+	if got.ResultSchema != model.SessionResultSchema {
+		t.Fatalf("ResultSchema = %d, want %d", got.ResultSchema, model.SessionResultSchema)
+	}
+	if got.TyperVersion != version.Version {
+		t.Fatalf("TyperVersion = %q, want %q", got.TyperVersion, version.Version)
+	}
+	if got.Options != model.OptionsSnapshot(wantOpts) {
+		t.Fatalf("Options = %#v, want %#v", got.Options, model.OptionsSnapshot(wantOpts))
+	}
+	if got.TotalKeystrokes <= 0 {
+		t.Fatalf("TotalKeystrokes = %d, want > 0", got.TotalKeystrokes)
+	}
+	if got.CorrectKeystrokes <= 0 {
+		t.Fatalf("CorrectKeystrokes = %d, want > 0", got.CorrectKeystrokes)
+	}
+	if len(got.WPMSamples) < 1 {
+		t.Fatalf("WPMSamples = %v, want at least one sample after completing a word", got.WPMSamples)
 	}
 	clearScreen := "\x1b[2J\x1b[H"
 	if !strings.Contains(out.String(), clearScreen) {

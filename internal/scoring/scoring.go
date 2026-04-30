@@ -2,15 +2,16 @@ package scoring
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"typer/internal/model"
 )
 
-// Keystrokes captures a session's raw and correctness counts.
-// Total represents every character the typist pressed (including ones later corrected).
-// Correct represents keystrokes that matched the expected character at time of press.
-// UncorrectedErrors represents final mismatches still present when a word was committed.
+// Keystrokes captures a session's raw counts for gross WPM and net penalty.
+// Total is every character typed (including corrections); Correct is recorded for diagnostics
+// but Compute derives Accuracy from final target vs typed text.
+// UncorrectedErrors is the sum of per-word CompareRunes mismatch weights when words are committed.
 type Keystrokes struct {
 	Total             int
 	Correct           int
@@ -20,36 +21,40 @@ type Keystrokes struct {
 // Compute returns metrics using the industry-standard formulas:
 //   - Gross WPM = (totalKeystrokes / 5) / minutes
 //   - Net WPM   = Gross - (uncorrectedErrors / minutes)
-//   - Accuracy  = correctKeystrokes / totalKeystrokes * 100
+//   - Accuracy  = 100 × textCorrect / (textCorrect + textErr), comparing typed text to
+//     the prompt normalized like the typing UI (strings.Fields joined by spaces). Raw
+//     newlines or multiple spaces in target otherwise disagree with joined typed words.
 //
-// If ks.Total is zero, the function falls back to the typed text string, which keeps
-// simpler tests and historic call sites functional.
+// If ks.Total is zero, gross WPM and uncorrectedErrors for net WPM fall back to comparing
+// full target vs typed text so callers without keystroke counts still get sensible metrics.
 func Compute(target, typed string, elapsed time.Duration, ks Keystrokes) model.SessionMetrics {
 	typedRunes := []rune(typed)
+	normTarget := strings.Join(strings.Fields(target), " ")
+	normTargetRunes := []rune(normTarget)
 
 	minutes := elapsed.Minutes()
 	if minutes <= 0 {
 		minutes = 1.0 / 60.0
 	}
 
-	total := ks.Total
-	correct := ks.Correct
+	totalK := ks.Total
 	uncorrected := ks.UncorrectedErrors
 
-	if total == 0 {
-		total = len(typedRunes)
-		correct, uncorrected = CompareRunes([]rune(target), typedRunes)
+	if totalK == 0 {
+		totalK = len(typedRunes)
+		_, uncorrected = CompareRunes(normTargetRunes, typedRunes)
 	}
 
-	gross := (float64(total) / 5.0) / minutes
+	gross := (float64(totalK) / 5.0) / minutes
 	net := gross - (float64(uncorrected) / minutes)
 	if net < 0 {
 		net = 0
 	}
 
-	accuracy := 0.0
-	if total > 0 {
-		accuracy = (float64(correct) / float64(total)) * 100.0
+	textCorrect, textErr := CompareRunes(normTargetRunes, typedRunes)
+	accuracy := 100.0
+	if d := textCorrect + textErr; d > 0 {
+		accuracy = 100 * (float64(textCorrect) / float64(d))
 	}
 	adjusted := gross * (accuracy / 100.0)
 

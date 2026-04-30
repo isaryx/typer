@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -61,7 +62,34 @@ func TestCompute_KeystrokeAccuracy(t *testing.T) {
 		UncorrectedErrors: 1,
 	})
 	if metrics.Accuracy != 80 {
-		t.Fatalf("expected 80%% accuracy, got %.2f", metrics.Accuracy)
+		t.Fatalf("expected 80%% text accuracy, got %.2f", metrics.Accuracy)
+	}
+}
+
+func TestCompute_TextAccuracyIncompleteDoesNotShow100(t *testing.T) {
+	// Final text shorter than target: every typed key matched at cursor, but passage incomplete.
+	m := Compute("hello", "hell", time.Minute, Keystrokes{
+		Total:             4,
+		Correct:           4,
+		UncorrectedErrors: 1,
+	})
+	if m.Accuracy != 80 {
+		t.Fatalf("Accuracy = %.2f, want 80 (not 100 despite keystroke hits)", m.Accuracy)
+	}
+}
+
+func TestCompute_AccuracyMatchesFieldsJoinWhenPromptHasNewlines(t *testing.T) {
+	// TUI uses strings.Fields; typed text is strings.Join(typedWords, " ").
+	// Newlines in the stored prompt must not make accuracy < 100% when errors are 0.
+	target := "Your vision will become clear only when you can look into your own heart.\n\nWho looks outside, dreams; who looks inside, awakes."
+	typed := strings.Join(strings.Fields(target), " ")
+	m := Compute(target, typed, 30*time.Second, Keystrokes{
+		Total:             len([]rune(typed)),
+		Correct:           len([]rune(typed)),
+		UncorrectedErrors: 0,
+	})
+	if m.Accuracy != 100 {
+		t.Fatalf("Accuracy = %.2f, want 100 when normalized text matches typed", m.Accuracy)
 	}
 }
 

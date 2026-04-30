@@ -25,6 +25,29 @@ type SessionOptions struct {
 	Indefinite bool
 }
 
+// SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
+const SessionResultSchema = 1
+
+// SessionOptionsSnapshot is the persisted form of SessionOptions (e.g. in history.json).
+type SessionOptionsSnapshot struct {
+	Mode       string `json:"mode"`
+	Words      int    `json:"words"`
+	Source     string `json:"source"`
+	Strict     bool   `json:"strict"`
+	Indefinite bool   `json:"indefinite"`
+}
+
+// OptionsSnapshot returns o as a value suitable for JSON in SessionResult.
+func OptionsSnapshot(o SessionOptions) SessionOptionsSnapshot {
+	return SessionOptionsSnapshot{
+		Mode:       o.Mode,
+		Words:      o.Words,
+		Source:     o.Source,
+		Strict:     o.Strict,
+		Indefinite: o.Indefinite,
+	}
+}
+
 type SessionMetrics struct {
 	GrossWPM    float64 `json:"gross_wpm"`
 	NetWPM      float64 `json:"net_wpm"`
@@ -43,6 +66,13 @@ type SessionResult struct {
 	TypedText string         `json:"typed_text"`
 	Metrics   SessionMetrics `json:"metrics"`
 	Aborted   bool           `json:"aborted,omitempty"`
+
+	ResultSchema      int                    `json:"result_schema,omitempty"`
+	TyperVersion      string                 `json:"typer_version,omitempty"`
+	Options           SessionOptionsSnapshot `json:"options,omitempty"`
+	TotalKeystrokes   int                    `json:"total_keystrokes,omitempty"`
+	CorrectKeystrokes int                    `json:"correct_keystrokes,omitempty"`
+	WPMSamples        []float64              `json:"wpm_samples,omitempty"`
 }
 
 type HistoryFile struct {

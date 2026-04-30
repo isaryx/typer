@@ -8,6 +8,7 @@ import (
 	"typer/internal/model"
 	"typer/internal/scoring"
 	"typer/internal/text"
+	"typer/internal/version"
 )
 
 type Runner struct {
@@ -46,6 +47,8 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	})
 	metrics.Consistency = scoring.ConsistencyFromSamples(tuiResult.WPMSamples)
 
+	wpmSamples := append([]float64(nil), tuiResult.WPMSamples...)
+
 	result := model.SessionResult{
 		ID:        startedAt.UTC().Format(time.RFC3339Nano),
 		StartedAt: startedAt.UTC(),
@@ -55,6 +58,13 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		TypedText: typed,
 		Metrics:   metrics,
 		Aborted:   tuiResult.Aborted,
+
+		ResultSchema:      model.SessionResultSchema,
+		TyperVersion:      version.Version,
+		Options:           model.OptionsSnapshot(opts),
+		TotalKeystrokes:   tuiResult.TotalKeystrokes,
+		CorrectKeystrokes: tuiResult.CorrectKeystrokes,
+		WPMSamples:        wpmSamples,
 	}
 	return result, nil
 }
