@@ -17,6 +17,11 @@ const (
 	colorInputFg      = "229"     // pale yellow
 	colorInputBadFg   = "203"     // salmon red
 	colorErrorFg      = "203"     // salmon red
+	// Ghost/shadow replay (dimmed so live typing stays primary).
+	colorGhostOK      = "243"
+	colorGhostBad     = "245"
+	colorGhostActive  = "246"
+	colorGhostInput   = "247"
 )
 
 type tuiStyles struct {
@@ -32,6 +37,14 @@ type tuiStyles struct {
 	input        lipgloss.Style
 	inputBad     lipgloss.Style
 	errorMessage lipgloss.Style
+	ghostCompleted    lipgloss.Style
+	ghostCompletedBad lipgloss.Style
+	ghostActive       lipgloss.Style
+	ghostActiveTyped  lipgloss.Style
+	ghostActiveCursor lipgloss.Style
+	ghostUpcoming     lipgloss.Style
+	ghostInput        lipgloss.Style
+	ghostInputBad     lipgloss.Style
 }
 
 func defaultStyles() tuiStyles {
@@ -48,5 +61,13 @@ func defaultStyles() tuiStyles {
 		input:        lipgloss.NewStyle().Foreground(lipgloss.Color(colorInputFg)),
 		inputBad:     lipgloss.NewStyle().Foreground(lipgloss.Color(colorInputBadFg)).Bold(true),
 		errorMessage: lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorFg)),
+		ghostCompleted:    lipgloss.NewStyle().Foreground(lipgloss.Color(colorGhostOK)).Faint(true),
+		ghostCompletedBad: lipgloss.NewStyle().Foreground(lipgloss.Color(colorGhostBad)).Bold(true).Faint(true),
+		ghostActive:       lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color(colorGhostActive)).Faint(true),
+		ghostActiveTyped:  lipgloss.NewStyle().Foreground(lipgloss.Color(colorGhostActive)).Faint(true),
+		ghostActiveCursor: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorCursorFg)).Background(lipgloss.Color("237")).Faint(true),
+		ghostUpcoming:     lipgloss.NewStyle().Foreground(lipgloss.Color(colorUpcoming)).Faint(true),
+		ghostInput:        lipgloss.NewStyle().Foreground(lipgloss.Color(colorGhostInput)).Faint(true),
+		ghostInputBad:     lipgloss.NewStyle().Foreground(lipgloss.Color(colorInputBadFg)).Bold(true).Faint(true),
 	}
 }

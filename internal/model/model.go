@@ -26,7 +26,23 @@ type SessionOptions struct {
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
-const SessionResultSchema = 1
+const SessionResultSchema = 2
+
+// ReplayEventKind marks a single timed input in TypingTrace.
+type ReplayEventKind string
+
+const (
+	ReplayEventKey       ReplayEventKind = "key"
+	ReplayEventBackspace ReplayEventKind = "bs"
+	ReplayEventCommit    ReplayEventKind = "commit"
+)
+
+// ReplayEvent is MS relative to session start (first keystroke). Used to replay a shadow typing animation.
+type ReplayEvent struct {
+	AtMS int64           `json:"at_ms"`
+	Kind ReplayEventKind `json:"kind"`
+	Rune string          `json:"rune,omitempty"` // single UTF-8 character when Kind==ReplayEventKey
+}
 
 // SessionOptionsSnapshot is the persisted form of SessionOptions (e.g. in history.json).
 type SessionOptionsSnapshot struct {
@@ -73,9 +89,33 @@ type SessionResult struct {
 	TotalKeystrokes   int                    `json:"total_keystrokes,omitempty"`
 	CorrectKeystrokes int                    `json:"correct_keystrokes,omitempty"`
 	WPMSamples        []float64              `json:"wpm_samples,omitempty"`
+	TypingTrace       []ReplayEvent          `json:"typing_trace,omitempty"`
 }
 
 type HistoryFile struct {
 	Version  int             `json:"version"`
 	Sessions []SessionResult `json:"sessions"`
+}
+
+// SessionOptionsForReplay reconstructs typing options from a stored session.
+// Indefinite is always false (replay is one passage; indefinite mode would repeat the same prompt).
+func SessionOptionsForReplay(r SessionResult) SessionOptions {
+	o := SessionOptions{
+		Mode:       r.Prompt.Mode,
+		Words:      0,
+		Source:     r.Prompt.Source,
+		Strict:     false,
+		Indefinite: false,
+	}
+	if r.ResultSchema >= 1 {
+		if r.Options.Mode != "" {
+			o.Mode = r.Options.Mode
+		}
+		o.Words = r.Options.Words
+		if r.Options.Source != "" {
+			o.Source = r.Options.Source
+		}
+		o.Strict = r.Options.Strict
+	}
+	return o
 }

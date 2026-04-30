@@ -109,6 +109,8 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return runHistory(args[1:], stdout)
 	case "stats":
 		return runStats(args[1:], stdout)
+	case "replay":
+		return runReplay(ctx, args[1:], stdin, stdout)
 	case "credits":
 		return runCredits(stdout)
 	case "key-press":
@@ -269,7 +271,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		result, err := runner.Run(ctx, opts, stdin, stdout)
+		result, err := runner.Run(ctx, opts, stdin, stdout, nil)
 		if err != nil {
 			return err
 		}
@@ -291,6 +293,89 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 
 	printStartResults(stdout, results)
 	return nil
+}
+
+func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := flag.NewFlagSet("replay", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	id := fs.String("id", "", "Session id (from `typer history`, id=...).")
+	nth := fs.Int("nth", 0, "Replay the n-th newest session (1 = most recent).")
+	last := fs.Bool("last", false, "Replay the most recent session.")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printReplayHelp(stdout)
+			return nil
+		}
+		return err
+	}
+	if err := rejectExtraArgs("replay", fs.Args()); err != nil {
+		return err
+	}
+
+	var useID string
+	var nSelect int
+	switch {
+	case *last:
+		nSelect = 1
+	case *nth > 0:
+		nSelect = *nth
+	case strings.TrimSpace(*id) != "":
+		useID = strings.TrimSpace(*id)
+	default:
+		return errors.New("replay requires --last, --nth N, or --id ID (see: typer replay -h)")
+	}
+
+	store, err := newHistoryStore()
+	if err != nil {
+		return err
+	}
+	var baseline model.SessionResult
+	if useID != "" {
+		baseline, err = store.GetByID(useID)
+	} else {
+		baseline, err = store.NthNewest(nSelect)
+	}
+	if err != nil {
+		return err
+	}
+	if len(strings.Fields(baseline.Prompt.Content)) == 0 {
+		return errors.New("cannot replay: stored prompt has no words")
+	}
+
+	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
+	opts := model.SessionOptionsForReplay(baseline)
+	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
+	if err != nil {
+		return err
+	}
+	if result.Aborted {
+		fmt.Fprintln(stdout, "\nReplay aborted.")
+		return nil
+	}
+	if err := store.Append(result); err != nil {
+		return err
+	}
+	printStartResults(stdout, []model.SessionResult{result})
+	printReplayComparison(stdout, baseline, result)
+	return nil
+}
+
+func printReplayComparison(out io.Writer, previous, current model.SessionResult) {
+	if current.Aborted {
+		return
+	}
+	dNet := current.Metrics.NetWPM - previous.Metrics.NetWPM
+	deltaMS := current.ElapsedMS - previous.ElapsedMS
+	fmt.Fprintln(out, "Comparison:")
+	fmt.Fprintf(out, "  Net WPM: %+.2f  (was %.2f →  %.2f)\n", dNet, previous.Metrics.NetWPM, current.Metrics.NetWPM)
+	switch {
+	case deltaMS < 0:
+		fmt.Fprintf(out, "  Time:    %s faster  (%s →  %s)\n", formatElapsedMS(-deltaMS), formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+	case deltaMS > 0:
+		fmt.Fprintf(out, "  Time:    %s slower  (%s →  %s)\n", formatElapsedMS(deltaMS), formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+	default:
+		fmt.Fprintf(out, "  Time:    same  (%s)\n", formatElapsedMS(current.ElapsedMS))
+	}
 }
 
 func printStartResults(out io.Writer, results []model.SessionResult) {
@@ -503,7 +588,7 @@ func runHistory(args []string, stdout io.Writer) error {
 	for i, r := range results {
 		fmt.Fprintf(
 			stdout,
-			"%2d) %s  mode=%s net=%.2f acc=%.2f%% errors=%d source=%s\n",
+			"%2d) %s  mode=%s net=%.2f acc=%.2f%% errors=%d source=%s  id=%s\n",
 			i+1,
 			r.StartedAt.Local().Format("2006-01-02 15:04:05"),
 			r.Prompt.Mode,
@@ -511,6 +596,7 @@ func runHistory(args []string, stdout io.Writer) error {
 			r.Metrics.Accuracy,
 			r.Metrics.Errors,
 			r.Prompt.Source,
+			r.ID,
 		)
 	}
 	return nil
@@ -589,6 +675,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  start        Run an interactive typing session.")
 	fmt.Fprintln(out, "  set          Save custom words and/or passages file paths.")
 	fmt.Fprintln(out, "  history      List recent sessions from local history.")
+	fmt.Fprintln(out, "  replay       Re-type a past session (same text) and compare metrics.")
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
 	fmt.Fprintln(out, "  credits      Show data source credits.")
 	fmt.Fprintln(out, "  key-press    Show key presses.")
@@ -599,6 +686,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
+	fmt.Fprintln(out, "  typer replay --last | --nth N | --id ID")
 	fmt.Fprintln(out, "  typer stats [--last N]")
 	fmt.Fprintln(out, "  typer credits")
 	fmt.Fprintln(out, "  typer key-press")
@@ -606,7 +694,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "Per-command help:")
 	fmt.Fprintln(out, "  typer start -h | typer start --help")
 	fmt.Fprintln(out, "  typer set -h   | typer set --help")
-	fmt.Fprintln(out, "  typer history -h | typer stats -h")
+	fmt.Fprintln(out, "  typer history -h | typer stats -h | typer replay -h")
 	fmt.Fprintln(out, "  typer key-press -h | typer key-press --help")
 	fmt.Fprintln(out, "  typer --reset-progress         # type y/yes to confirm on the prompt")
 }
@@ -678,4 +766,20 @@ func printStatsHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
 	fmt.Fprintln(out, "      --last int   Maximum sessions to analyze (default 20).")
+}
+
+func printReplayHelp(out io.Writer) {
+	fmt.Fprintln(out, "Re-type the same passage as a stored session and compare speed to your previous run.")
+	fmt.Fprintln(out, "When the session was saved with a typing trace, a dim \"shadow\" replays the")
+	fmt.Fprintln(out, "previous keystrokes in real time (same timing) while you type again below.")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Usage:")
+	fmt.Fprintln(out, "  typer replay --last")
+	fmt.Fprintln(out, "  typer replay --nth N      # 1 = most recent (same order as typer history)")
+	fmt.Fprintln(out, "  typer replay --id SESSION_ID")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Options:")
+	fmt.Fprintln(out, "      --last       Pick the most recent session.")
+	fmt.Fprintln(out, "      --nth int    Pick the n-th newest session (1 = newest).")
+	fmt.Fprintln(out, "      --id string  Exact session id from `typer history` (id=...).")
 }

@@ -545,6 +545,17 @@ func TestRunHistoryRejectsPositionalArgs(t *testing.T) {
 	}
 }
 
+func TestRunReplayRequiresSelector(t *testing.T) {
+	var out bytes.Buffer
+	err := runReplay(context.Background(), nil, strings.NewReader(""), &out)
+	if err == nil {
+		t.Fatal("expected error when replay has no --last, --nth, or --id")
+	}
+	if !strings.Contains(err.Error(), "replay requires") {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
 func TestRunStatsEmptyAndSummaryOutput(t *testing.T) {
 	home := t.TempDir()
 	setTestUserDirs(t, home)
@@ -634,6 +645,15 @@ func TestHelpPrintersIncludeUsage(t *testing.T) {
 		got := out.String()
 		if !strings.Contains(got, "typer stats") || !strings.Contains(got, testFlagLast) {
 			t.Fatalf("unexpected stats help: %q", got)
+		}
+	})
+
+	t.Run("replay", func(t *testing.T) {
+		var out bytes.Buffer
+		printReplayHelp(&out)
+		got := out.String()
+		if !strings.Contains(got, "typer replay") || !strings.Contains(got, "--nth") {
+			t.Fatalf("unexpected replay help: %q", got)
 		}
 	})
 }

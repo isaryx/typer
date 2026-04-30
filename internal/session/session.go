@@ -23,7 +23,8 @@ func NewRunner(provider text.Provider) *Runner {
 	}
 }
 
-func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Reader, output io.Writer) (model.SessionResult, error) {
+// replayBaseline, when non-nil, enables replay UI (previous run metrics) for the same prompt.
+func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Reader, output io.Writer, replayBaseline *model.SessionResult) (model.SessionResult, error) {
 	prompt, err := r.Provider.Next(ctx, text.Constraints{
 		Words:  opts.Words,
 		Source: opts.Source,
@@ -32,7 +33,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		return model.SessionResult{}, err
 	}
 
-	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now)
+	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, replayBaseline)
 	if err != nil {
 		return model.SessionResult{}, err
 	}
@@ -48,6 +49,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	metrics.Consistency = scoring.ConsistencyFromSamples(tuiResult.WPMSamples)
 
 	wpmSamples := append([]float64(nil), tuiResult.WPMSamples...)
+	typingTrace := append([]model.ReplayEvent(nil), tuiResult.TypingTrace...)
 
 	result := model.SessionResult{
 		ID:        startedAt.UTC().Format(time.RFC3339Nano),
@@ -65,6 +67,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		TotalKeystrokes:   tuiResult.TotalKeystrokes,
 		CorrectKeystrokes: tuiResult.CorrectKeystrokes,
 		WPMSamples:        wpmSamples,
+		TypingTrace:       typingTrace,
 	}
 	return result, nil
 }

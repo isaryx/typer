@@ -199,3 +199,49 @@ func TestHistoryStoreReadNormalizesLegacyVersion(t *testing.T) {
 		t.Fatalf("unexpected sessions: %#v", got.Sessions)
 	}
 }
+
+func TestHistoryStoreGetByID(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	if err := store.Append(model.SessionResult{ID: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{ID: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetByID("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "a" {
+		t.Fatalf("got %q", got.ID)
+	}
+	if _, err := store.GetByID("missing"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestHistoryStoreNthNewest(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	for _, id := range []string{"1", "2", "3"} {
+		if err := store.Append(model.SessionResult{ID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := store.NthNewest(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID != "3" {
+		t.Fatalf("newest = %q, want 3", first.ID)
+	}
+	second, err := store.NthNewest(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID != "2" {
+		t.Fatalf("2nd = %q, want 2", second.ID)
+	}
+	if _, err := store.NthNewest(10); err == nil {
+		t.Fatal("expected error for out-of-range nth")
+	}
+}

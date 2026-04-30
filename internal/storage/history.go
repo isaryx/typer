@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -42,6 +43,35 @@ func (s *HistoryStore) Append(result model.SessionResult) error {
 	}
 	h.Version = historyVersion
 	return writeJSONFileAtomic(s.path, h)
+}
+
+// GetByID returns the session with the given id, or an error if not found.
+func (s *HistoryStore) GetByID(id string) (model.SessionResult, error) {
+	h, err := s.read()
+	if err != nil {
+		return model.SessionResult{}, err
+	}
+	for _, sess := range h.Sessions {
+		if sess.ID == id {
+			return sess, nil
+		}
+	}
+	return model.SessionResult{}, fmt.Errorf("no session with id %q", id)
+}
+
+// NthNewest returns the n-th newest session (n=1 is most recent), matching the order of history --last.
+func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
+	if n < 1 {
+		return model.SessionResult{}, fmt.Errorf("nth must be >= 1")
+	}
+	list, err := s.List(n)
+	if err != nil {
+		return model.SessionResult{}, err
+	}
+	if len(list) < n {
+		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history", len(list))
+	}
+	return list[n-1], nil
 }
 
 func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {

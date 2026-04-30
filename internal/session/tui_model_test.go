@@ -18,6 +18,7 @@ func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -36,6 +37,7 @@ func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.appendRunes([]rune("x"))
 	if m.current != "" {
@@ -63,6 +65,7 @@ func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 			return now
 		},
 		false,
+		nil,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -84,6 +87,7 @@ func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.current = "hello"
 	m.commitCurrentWord()
@@ -102,6 +106,7 @@ func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.appendRunes([]rune("hx"))
 	if m.totalKeystrokes != 2 {
@@ -121,6 +126,7 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.appendRunes([]rune("hxllo"))
 	m.commitCurrentWord()
@@ -138,6 +144,7 @@ func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 		true,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.width = 16
 	out := m.renderWords(14)
@@ -152,6 +159,7 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.width = 200
 	if got := m.wrapWidth(); got != maxWrapWidth {
@@ -169,6 +177,7 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	got := m.View()
 	if !strings.Contains(got, "Mode: non-strict (words)") {
@@ -184,6 +193,7 @@ func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 		false,
 		func() time.Time { return now },
 		false,
+		nil,
 	)
 	if !m.startedAt.IsZero() {
 		t.Fatalf("expected zero startedAt before typing, got %v", m.startedAt)
@@ -209,6 +219,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 		false,
 		func() time.Time { return now },
 		false,
+		nil,
 	)
 	m.aborted = true
 	m.endedAt = now.UTC()
@@ -228,6 +239,7 @@ func TestInitReturnsNilCommand(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	if cmd := m.Init(); cmd != nil {
 		t.Fatalf("expected nil init command, got %v", cmd)
@@ -240,10 +252,11 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		false,
 		func() time.Time { return time.Unix(100, 0) },
 		false,
+		nil,
 	)
 	m.current = "hé"
 	gotModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
-	updated := gotModel.(typingSessionModel)
+	updated := gotModel.(*typingSessionModel)
 	if updated.current != "h" {
 		t.Fatalf("current = %q, want %q", updated.current, "h")
 	}
@@ -259,10 +272,11 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 			return now
 		},
 		false,
+		nil,
 	)
 	m.current = "hello"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
-	updated := gotModel.(typingSessionModel)
+	updated := gotModel.(*typingSessionModel)
 	if !updated.isDone() {
 		t.Fatal("expected session to be done after committing only word")
 	}
@@ -284,10 +298,11 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 			return now
 		},
 		false,
+		nil,
 	)
 	m.current = "go"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	updated := gotModel.(typingSessionModel)
+	updated := gotModel.(*typingSessionModel)
 	if !updated.isDone() {
 		t.Fatal("expected enter to commit and finish")
 	}
@@ -304,9 +319,10 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 				false,
 				func() time.Time { return time.Unix(123, 0) },
 				false,
+				nil,
 			)
 			gotModel, cmd := m.Update(tea.KeyMsg{Type: key})
-			updated := gotModel.(typingSessionModel)
+			updated := gotModel.(*typingSessionModel)
 			if !updated.aborted {
 				t.Fatal("expected aborted flag to be set")
 			}

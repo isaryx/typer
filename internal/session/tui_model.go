@@ -19,6 +19,8 @@ import (
 // readable (roughly 65–95 characters is a common prose band; 88 matches e.g. rustfmt).
 const maxWrapWidth = 88
 
+type shadowTickMsg struct{}
+
 type typingSessionResult struct {
 	TypedText         string
 	StartedAt         time.Time
@@ -31,6 +33,7 @@ type typingSessionResult struct {
 	TotalKeystrokes   int
 	CorrectKeystrokes int
 	UncorrectedErrors int
+	TypingTrace       []model.ReplayEvent
 }
 
 type typingSessionModel struct {
@@ -59,15 +62,39 @@ type typingSessionModel struct {
 	width int
 	// indefinite shows a hint that Ctrl+C ends the run with a summary (CLI indefinite mode).
 	indefinite bool
+	// replay, when set, shows the previous run’s metrics (replay mode).
+	replay *model.SessionResult
+
+	typingTrace []model.ReplayEvent
+
+	// Shadow replay (previous session animation), driven by replay.TypingTrace.
+	shadowTrace       []model.ReplayEvent
+	shadowTracePos    int
+	shadowStrict      bool
+	shadowWords       []string
+	shadowWordMatches []bool
+	shadowCurrent     string
+	shadowWordIndex   int
+	replayClockStart  time.Time
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool) typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult) *typingSessionModel {
 	if now == nil {
 		now = time.Now
 	}
 	words := strings.Fields(prompt.Content)
 	n := len(words)
-	return typingSessionModel{
+
+	shadowStrict := false
+	var shadowTrace []model.ReplayEvent
+	if replay != nil {
+		shadowStrict = model.SessionOptionsForReplay(*replay).Strict
+		if len(replay.TypingTrace) > 0 {
+			shadowTrace = append([]model.ReplayEvent(nil), replay.TypingTrace...)
+		}
+	}
+
+	return &typingSessionModel{
 		prompt:      prompt,
 		words:       words,
 		typedWords:  make([]string, 0, n),
@@ -77,15 +104,23 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		now:         now,
 		styles:      defaultStyles(),
 		indefinite:  indefinite,
+		replay:      replay,
+
+		shadowTrace:       shadowTrace,
+		shadowStrict:      shadowStrict,
+		shadowWords:       make([]string, 0, n),
+		shadowWordMatches: make([]bool, 0, n),
 	}
 }
 
-func (m typingSessionModel) Init() tea.Cmd {
+func (m *typingSessionModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case shadowTickMsg:
+		return m.applyShadowTick()
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		if m.width < 20 {
@@ -104,33 +139,55 @@ func (m typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.Type {
 		case tea.KeyBackspace:
+			m.recordTraceBackspace()
 			m.current = removeLastRune(m.current)
 			m.status = ""
 			return m, nil
 		case tea.KeySpace, tea.KeyEnter:
-			m.commitCurrentWord()
+			cmd := m.commitCurrentWord()
 			if m.isDone() {
 				m.endedAt = m.now().UTC()
 				return m, tea.Quit
 			}
-			return m, nil
+			return m, cmd
 		default:
 			if msg.Type == tea.KeyRunes {
-				m.appendRunes(msg.Runes)
+				cmd := m.appendRunes(msg.Runes)
 				m.status = ""
+				return m, cmd
 			}
 		}
 	}
 	return m, nil
 }
 
-func (m typingSessionModel) View() string {
+func (m *typingSessionModel) View() string {
 	if len(m.words) == 0 {
 		return "No text available for this session.\n"
 	}
 
 	tw := m.wrapWidth()
 	var b strings.Builder
+	if m.replay != nil {
+		b.WriteString(m.styles.title.Width(tw).Render("Replay — type the same text again"))
+		b.WriteString("\n")
+		b.WriteString(m.styles.meta.Width(tw).Render(formatReplaySummary(m.replay)))
+		b.WriteString("\n\n")
+	}
+	if m.hasShadowReplay() {
+		b.WriteString(m.styles.meta.Width(tw).Render("Shadow — previous typing (timed replay)"))
+		b.WriteString("\n")
+		if m.replayClockStart.IsZero() {
+			b.WriteString(m.styles.meta.Width(tw).Render("Starts when you type your first character (synced with your run)."))
+			b.WriteString("\n")
+		}
+		sprompt := m.renderShadowWords(m.promptInnerWidth())
+		b.WriteString(m.styles.promptBox.Width(tw).Render(sprompt))
+		b.WriteString("\n")
+		b.WriteString("> ")
+		b.WriteString(m.renderShadowInputWord())
+		b.WriteString("\n\n")
+	}
 	b.WriteString(m.styles.title.Width(tw).Render("Guide: Type the current word, then press Space to advance"))
 	b.WriteString("\n")
 	strictMode := "strict"
@@ -166,7 +223,7 @@ func (m typingSessionModel) View() string {
 	return b.String()
 }
 
-func (m typingSessionModel) termWidth() int {
+func (m *typingSessionModel) termWidth() int {
 	if m.width > 0 {
 		return m.width
 	}
@@ -174,7 +231,7 @@ func (m typingSessionModel) termWidth() int {
 }
 
 // wrapWidth is min(terminal width, maxWrapWidth) so content does not stretch across ultra-wide screens.
-func (m typingSessionModel) wrapWidth() int {
+func (m *typingSessionModel) wrapWidth() int {
 	tw := m.termWidth()
 	if tw > maxWrapWidth {
 		return maxWrapWidth
@@ -183,7 +240,7 @@ func (m typingSessionModel) wrapWidth() int {
 }
 
 // promptInnerWidth is the line width for text inside the bordered prompt (account for left+right border runes).
-func (m typingSessionModel) promptInnerWidth() int {
+func (m *typingSessionModel) promptInnerWidth() int {
 	w := m.wrapWidth() - 2
 	if w < 1 {
 		return 1
@@ -191,7 +248,7 @@ func (m typingSessionModel) promptInnerWidth() int {
 	return w
 }
 
-func (m typingSessionModel) renderWordPiece(i int, w string) string {
+func (m *typingSessionModel) renderWordPiece(i int, w string) string {
 	switch {
 	case i < m.wordIndex:
 		if i < len(m.wordMatches) && !m.wordMatches[i] {
@@ -205,7 +262,7 @@ func (m typingSessionModel) renderWordPiece(i int, w string) string {
 	}
 }
 
-func (m typingSessionModel) renderWords(lineWidth int) string {
+func (m *typingSessionModel) renderWords(lineWidth int) string {
 	if lineWidth < 1 {
 		lineWidth = 1
 	}
@@ -238,7 +295,7 @@ func (m typingSessionModel) renderWords(lineWidth int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m typingSessionModel) renderActiveWord(target string) string {
+func (m *typingSessionModel) renderActiveWord(target string) string {
 	targetRunes := []rune(target)
 	if len(targetRunes) == 0 {
 		return m.styles.active.Render(target)
@@ -262,7 +319,7 @@ func (m typingSessionModel) renderActiveWord(target string) string {
 
 // renderInputWord groups consecutive good/bad runes into single styled runs so
 // each render emits one ANSI escape per run instead of per rune.
-func (m typingSessionModel) renderInputWord() string {
+func (m *typingSessionModel) renderInputWord() string {
 	if m.wordIndex >= len(m.words) {
 		return m.styles.input.Render(m.current)
 	}
@@ -297,23 +354,128 @@ func (m typingSessionModel) renderInputWord() string {
 	return b.String()
 }
 
-func (m *typingSessionModel) commitCurrentWord() {
+func (m *typingSessionModel) hasShadowReplay() bool {
+	return len(m.shadowTrace) > 0
+}
+
+func (m *typingSessionModel) renderShadowWordPiece(i int, w string) string {
+	switch {
+	case i < m.shadowWordIndex:
+		if i < len(m.shadowWordMatches) && !m.shadowWordMatches[i] {
+			return m.styles.ghostCompletedBad.Render(w)
+		}
+		return m.styles.ghostCompleted.Render(w)
+	case i == m.shadowWordIndex:
+		return m.renderShadowActiveWord(w)
+	default:
+		return m.styles.ghostUpcoming.Render(w)
+	}
+}
+
+func (m *typingSessionModel) renderShadowActiveWord(target string) string {
+	targetRunes := []rune(target)
+	if len(targetRunes) == 0 {
+		return m.styles.ghostActive.Render(target)
+	}
+	cursor := utf8.RuneCountInString(m.shadowCurrent)
+	if cursor >= len(targetRunes) {
+		return m.styles.ghostActive.Render(target)
+	}
+	var b strings.Builder
+	if cursor > 0 {
+		b.WriteString(m.styles.ghostActiveTyped.Render(string(targetRunes[:cursor])))
+	}
+	b.WriteString(m.styles.ghostActiveCursor.Render(string(targetRunes[cursor])))
+	if cursor+1 < len(targetRunes) {
+		b.WriteString(m.styles.ghostActive.Render(string(targetRunes[cursor+1:])))
+	}
+	return b.String()
+}
+
+func (m *typingSessionModel) renderShadowWords(lineWidth int) string {
+	if lineWidth < 1 {
+		lineWidth = 1
+	}
+	var lines []string
+	var parts []string
+	cur := 0
+	for i, w := range m.words {
+		seg := m.renderShadowWordPiece(i, w)
+		sw := lipgloss.Width(seg)
+		sep := 0
+		if len(parts) > 0 {
+			sep = 1
+		}
+		if cur+sep+sw > lineWidth && len(parts) > 0 {
+			lines = append(lines, strings.Join(parts, " "))
+			parts = nil
+			cur = 0
+			sep = 0
+		}
+		if len(parts) > 0 {
+			cur++
+		}
+		parts = append(parts, seg)
+		cur += sw
+	}
+	if len(parts) > 0 {
+		lines = append(lines, strings.Join(parts, " "))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *typingSessionModel) renderShadowInputWord() string {
+	if m.shadowWordIndex >= len(m.words) {
+		return m.styles.ghostInput.Render(m.shadowCurrent)
+	}
+	target := []rune(m.words[m.shadowWordIndex])
+	typed := []rune(m.shadowCurrent)
+	if len(typed) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	runStart := 0
+	runBad := len(target) > 0 && typed[0] != target[0]
+	isBad := func(i int) bool {
+		return i < len(target) && typed[i] != target[i]
+	}
+	flush := func(end int) {
+		segment := string(typed[runStart:end])
+		if runBad {
+			b.WriteString(m.styles.ghostInputBad.Render(segment))
+		} else {
+			b.WriteString(m.styles.ghostInput.Render(segment))
+		}
+	}
+	for i := 1; i < len(typed); i++ {
+		if bad := isBad(i); bad != runBad {
+			flush(i)
+			runStart = i
+			runBad = bad
+		}
+	}
+	flush(len(typed))
+	return b.String()
+}
+
+func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 	if m.wordIndex >= len(m.words) {
-		return
+		return nil
 	}
 
 	currentInput := m.current
 	if currentInput == "" {
 		m.status = "Type the current word before advancing."
-		return
+		return nil
 	}
 	targetWord := m.words[m.wordIndex]
 	matched := currentInput == targetWord
 	if m.strict && !matched {
 		m.status = ""
-		return
+		return nil
 	}
-	m.startTimerIfNeeded()
+	cmd := m.startTimerIfNeeded()
+	m.recordTraceCommit()
 
 	if !matched {
 		m.totalErrors++
@@ -334,6 +496,7 @@ func (m *typingSessionModel) commitCurrentWord() {
 	m.wordIndex++
 	m.current = ""
 	m.appendWPMSample()
+	return cmd
 }
 
 func (m *typingSessionModel) appendWPMSample() {
@@ -345,18 +508,122 @@ func (m *typingSessionModel) appendWPMSample() {
 	m.wpmSamples = append(m.wpmSamples, gross)
 }
 
-func (m *typingSessionModel) startTimerIfNeeded() {
+// startTimerIfNeeded starts the session clock on first input and, when a shadow trace is loaded,
+// aligns replayClockStart to the same instant so ghost timing matches the primary run from t=0.
+func (m *typingSessionModel) startTimerIfNeeded() tea.Cmd {
 	if !m.startedAt.IsZero() {
-		return
+		return nil
 	}
 	m.startedAt = m.now().UTC()
+	if len(m.shadowTrace) > 0 && m.replayClockStart.IsZero() {
+		m.replayClockStart = m.now()
+		return tea.Tick(16*time.Millisecond, func(time.Time) tea.Msg { return shadowTickMsg{} })
+	}
+	return nil
 }
 
-func (m typingSessionModel) isDone() bool {
+func (m *typingSessionModel) traceAtMS() int64 {
+	if m.startedAt.IsZero() {
+		return 0
+	}
+	return m.now().Sub(m.startedAt).Milliseconds()
+}
+
+func (m *typingSessionModel) recordTraceKey(r rune) {
+	m.typingTrace = append(m.typingTrace, model.ReplayEvent{
+		AtMS: m.traceAtMS(),
+		Kind: model.ReplayEventKey,
+		Rune: string(r),
+	})
+}
+
+func (m *typingSessionModel) recordTraceBackspace() {
+	if m.current == "" {
+		return
+	}
+	m.typingTrace = append(m.typingTrace, model.ReplayEvent{
+		AtMS: m.traceAtMS(),
+		Kind: model.ReplayEventBackspace,
+	})
+}
+
+func (m *typingSessionModel) recordTraceCommit() {
+	m.typingTrace = append(m.typingTrace, model.ReplayEvent{
+		AtMS: m.traceAtMS(),
+		Kind: model.ReplayEventCommit,
+	})
+}
+
+func (m *typingSessionModel) applyShadowTick() (tea.Model, tea.Cmd) {
+	if m.replayClockStart.IsZero() {
+		return m, nil
+	}
+	elapsed := m.now().Sub(m.replayClockStart).Milliseconds()
+	for m.shadowTracePos < len(m.shadowTrace) && m.shadowTrace[m.shadowTracePos].AtMS <= elapsed {
+		ev := m.shadowTrace[m.shadowTracePos]
+		switch ev.Kind {
+		case model.ReplayEventKey:
+			if ev.Rune != "" {
+				r, _ := utf8.DecodeRuneInString(ev.Rune)
+				if r != utf8.RuneError {
+					m.applyShadowKey(r)
+				}
+			}
+		case model.ReplayEventBackspace:
+			m.applyShadowBackspace()
+		case model.ReplayEventCommit:
+			m.applyShadowCommit()
+		}
+		m.shadowTracePos++
+	}
+	var cmd tea.Cmd
+	if m.shadowTracePos < len(m.shadowTrace) {
+		cmd = tea.Tick(16*time.Millisecond, func(time.Time) tea.Msg { return shadowTickMsg{} })
+	}
+	return m, cmd
+}
+
+func (m *typingSessionModel) applyShadowKey(r rune) {
+	if m.shadowWordIndex >= len(m.words) {
+		return
+	}
+	target := []rune(m.words[m.shadowWordIndex])
+	current := []rune(m.shadowCurrent)
+	pos := len(current)
+	matched := pos < len(target) && r == target[pos]
+	if m.shadowStrict && !matched {
+		return
+	}
+	m.shadowCurrent = string(append(current, r))
+}
+
+func (m *typingSessionModel) applyShadowBackspace() {
+	m.shadowCurrent = removeLastRune(m.shadowCurrent)
+}
+
+func (m *typingSessionModel) applyShadowCommit() {
+	if m.shadowWordIndex >= len(m.words) {
+		return
+	}
+	if m.shadowCurrent == "" {
+		return
+	}
+	targetWord := m.words[m.shadowWordIndex]
+	matched := m.shadowCurrent == targetWord
+	if m.shadowStrict && !matched {
+		return
+	}
+	m.shadowWordMatches = append(m.shadowWordMatches, matched)
+	m.shadowWords = append(m.shadowWords, m.shadowCurrent)
+	m.shadowWordIndex++
+	m.shadowCurrent = ""
+}
+
+func (m *typingSessionModel) isDone() bool {
 	return m.wordIndex >= len(m.words) && len(m.words) > 0
 }
 
-func (m typingSessionModel) result() typingSessionResult {
+func (m *typingSessionModel) result() typingSessionResult {
 	ended := m.endedAt
 	if ended.IsZero() {
 		ended = m.now().UTC()
@@ -378,11 +645,49 @@ func (m typingSessionModel) result() typingSessionResult {
 		TotalKeystrokes:   m.totalKeystrokes,
 		CorrectKeystrokes: m.correctKeystrokes,
 		UncorrectedErrors: m.uncorrectedErrors,
+		TypingTrace:       append([]model.ReplayEvent(nil), m.typingTrace...),
 	}
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite)
+func formatReplaySummary(prev *model.SessionResult) string {
+	if prev == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		"Previous run: net %.2f wpm · %s · %.1f%% acc · %d err",
+		prev.Metrics.NetWPM,
+		formatReplayDuration(prev.ElapsedMS),
+		prev.Metrics.Accuracy,
+		prev.Metrics.Errors,
+	)
+}
+
+func formatReplayDuration(ms int64) string {
+	if ms < 0 {
+		return "0 ms"
+	}
+	if ms < 1000 {
+		return fmt.Sprintf("%d ms", ms)
+	}
+	secs := ms / 1000
+	if secs < 60 {
+		if ms < 10_000 {
+			return fmt.Sprintf("%.1f s", float64(ms)/1000)
+		}
+		return fmt.Sprintf("%d s", secs)
+	}
+	mins := secs / 60
+	secs %= 60
+	if mins < 60 {
+		return fmt.Sprintf("%dm %02ds", mins, secs)
+	}
+	h := mins / 60
+	mins %= 60
+	return fmt.Sprintf("%dh %02dm %02ds", h, mins, secs)
+}
+
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}
@@ -401,24 +706,26 @@ func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, pr
 		return typingSessionResult{}, err
 	}
 
-	fm, ok := finalModel.(typingSessionModel)
+	fm, ok := finalModel.(*typingSessionModel)
 	if !ok {
 		return typingSessionResult{}, fmt.Errorf("unexpected final session model")
 	}
 	return fm.result(), nil
 }
 
-func (m *typingSessionModel) appendRunes(runes []rune) {
+func (m *typingSessionModel) appendRunes(runes []rune) tea.Cmd {
 	if m.wordIndex >= len(m.words) {
-		return
+		return nil
 	}
+	var startCmd tea.Cmd
 	if len(runes) > 0 {
-		m.startTimerIfNeeded()
+		startCmd = m.startTimerIfNeeded()
 	}
 
 	target := []rune(m.words[m.wordIndex])
 	current := []rune(m.current)
 	for _, r := range runes {
+		m.recordTraceKey(r)
 		pos := len(current)
 		m.totalKeystrokes++
 		matched := pos < len(target) && r == target[pos]
@@ -431,6 +738,7 @@ func (m *typingSessionModel) appendRunes(runes []rune) {
 		current = append(current, r)
 	}
 	m.current = string(current)
+	return startCmd
 }
 
 func removeLastRune(s string) string {

@@ -29,7 +29,7 @@ func TestRunnerPropagatesProviderError(t *testing.T) {
 	wantErr := errors.New("provider offline")
 	r := NewRunner(&fakeProvider{err: wantErr})
 
-	_, err := r.Run(context.Background(), model.SessionOptions{Mode: model.ModeWords}, strings.NewReader(""), &bytes.Buffer{})
+	_, err := r.Run(context.Background(), model.SessionOptions{Mode: model.ModeWords}, strings.NewReader(""), &bytes.Buffer{}, nil)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected provider error, got %v", err)
 	}
@@ -58,6 +58,7 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 		wantOpts,
 		strings.NewReader("hello "),
 		&out,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -111,6 +112,9 @@ func TestRunnerRunSuccessBuildsSessionResult(t *testing.T) {
 	if len(got.WPMSamples) < 1 {
 		t.Fatalf("WPMSamples = %v, want at least one sample after completing a word", got.WPMSamples)
 	}
+	if len(got.TypingTrace) < 1 {
+		t.Fatalf("expected typing trace to be stored, got %d events", len(got.TypingTrace))
+	}
 	clearScreen := "\x1b[2J\x1b[H"
 	if !strings.Contains(out.String(), clearScreen) {
 		t.Fatalf("expected clear-screen sequence in output, got %q", out.String())
@@ -138,6 +142,7 @@ func TestRunnerRunPassesConstraints(t *testing.T) {
 		model.SessionOptions{Words: wantWords, Source: wantSource},
 		strings.NewReader("\x1b"),
 		&bytes.Buffer{},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
