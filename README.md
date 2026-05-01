@@ -64,7 +64,7 @@ Session history and settings stay on your machine (for example under `~/.config/
 
 ## Credits
 
-**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT).
+**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT); [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) for terminal sizing when laying out the session and stats panels (BSD-3-Clause).
 
 **Session IDs (ULID):** [oklog/ulid](https://github.com/oklog/ulid) — Go package [`github.com/oklog/ulid/v2`](https://pkg.go.dev/github.com/oklog/ulid/v2), Apache License 2.0. ([ULID specification](https://github.com/ulid/spec).)
 
