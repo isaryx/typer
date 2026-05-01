@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
@@ -58,14 +58,16 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="$GITHUB_REF_NAME"
           fi
-          # Normalize common input/tag mistakes:
-          # - v0.0.1 or V0.0.1 -> 0.0.1
-          # - .0.0.1 -> 0.0.1
+          # v0.3.0 → 0.3.0; v.0.3.0 → .0.3.0 → 0.3.0
           VERSION="${VERSION#v}"
           VERSION="${VERSION#V}"
           VERSION="${VERSION#.}"
+          if [ -z "$VERSION" ]; then
+            echo "::error::Empty version"
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Set up Go
