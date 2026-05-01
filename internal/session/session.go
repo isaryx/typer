@@ -46,7 +46,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		baseline = b
 	}
 
-	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, baseline, showReplayUI)
+	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, baseline, showReplayUI, opts.FingerHint)
 	if err != nil {
 		return model.SessionResult{}, err
 	}
@@ -67,13 +67,13 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	result := model.SessionResult{
 		ID:          newSessionID(startedAt),
 		ContentHash: model.PromptContentHash(prompt.Content),
-		StartedAt: startedAt.UTC(),
-		EndedAt:   endedAt.UTC(),
-		ElapsedMS: endedAt.Sub(startedAt).Milliseconds(),
-		Prompt:    prompt,
-		TypedText: typed,
-		Metrics:   metrics,
-		Aborted:   tuiResult.Aborted,
+		StartedAt:   startedAt.UTC(),
+		EndedAt:     endedAt.UTC(),
+		ElapsedMS:   endedAt.Sub(startedAt).Milliseconds(),
+		Prompt:      prompt,
+		TypedText:   typed,
+		Metrics:     metrics,
+		Aborted:     tuiResult.Aborted,
 
 		ResultSchema:      model.SessionResultSchema,
 		TyperVersion:      version.Version,

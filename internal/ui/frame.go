@@ -30,6 +30,53 @@ func TruncateTopCaption(label string, middleCells int) string {
 
 // RenderRoundedTop draws ╭ + styled caption + horizontal rule + ╮. marginLeft is
 // prepended to the row (e.g. "  " for indented metrics, "" for passage).
+// RenderRoundedTopHalves draws ╭─╮ with leftLabel centered in the left half of the rule and
+// rightLabel centered in the right half (only ─ between segments; no mid junction glyph).
+// middleCells is the cell count strictly between the corner characters, matching RenderRoundedTop.
+func RenderRoundedTopHalves(marginLeft string, border, caption lipgloss.Style, leftLabel, rightLabel string, middleCells int) string {
+	if middleCells < 4 {
+		return RenderRoundedTop(marginLeft, border, caption, leftLabel+" · "+rightLabel, middleCells)
+	}
+	leftHalf := middleCells / 2
+	rightHalf := middleCells - leftHalf
+	leftSeg := centerCaptionSegment(leftLabel, leftHalf, border, caption)
+	rightSeg := centerCaptionSegment(rightLabel, rightHalf, border, caption)
+	core := lipgloss.JoinHorizontal(lipgloss.Top,
+		border.Render("╭"),
+		leftSeg,
+		rightSeg,
+		border.Render("╮"),
+	)
+	if marginLeft == "" {
+		return core
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
+}
+
+func centerCaptionSegment(label string, segmentCells int, border, caption lipgloss.Style) string {
+	if segmentCells <= 0 {
+		return ""
+	}
+	trunc := TruncateTopCaption(label, segmentCells)
+	core := " " + trunc + " "
+	for lipgloss.Width(core) > segmentCells && len([]rune(trunc)) > 1 {
+		trunc = string([]rune(trunc)[:len([]rune(trunc))-1])
+		core = " " + trunc + " "
+	}
+	if lipgloss.Width(core) > segmentCells {
+		core = ""
+	}
+	rendered := caption.Render(core)
+	w := lipgloss.Width(rendered)
+	dash := segmentCells - w
+	if dash < 0 {
+		dash = 0
+	}
+	ld := dash / 2
+	rd := dash - ld
+	return border.Render(strings.Repeat("─", ld)) + rendered + border.Render(strings.Repeat("─", rd))
+}
+
 func RenderRoundedTop(marginLeft string, border, caption lipgloss.Style, label string, middleCells int) string {
 	trunc := TruncateTopCaption(label, middleCells)
 	prefix := " " + trunc + " "

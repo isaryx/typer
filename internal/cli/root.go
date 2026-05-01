@@ -51,46 +51,59 @@ See README "Credits" for bundled content notes and library links.
 
 var newHistoryStore = storage.NewHistoryStore
 
-// extractPresenceFlags removes bare strict / indefinite tokens from args
+// extractPresenceFlags removes bare strict / indefinite / finger-hint tokens from args
 // (presence only). Names with '=' or followed by a boolean-looking token
 // are rejected.
-func extractPresenceFlags(args []string) (rest []string, strict, indefinite bool, err error) {
+func extractPresenceFlags(args []string) (rest []string, strict, indefinite, fingerHint bool, err error) {
 	strictNames := map[string]struct{}{
 		"--strict": {}, "-strict": {}, "-s": {},
 	}
 	indefNames := map[string]struct{}{
 		"--indefinite": {}, "-indefinite": {}, "-i": {},
 	}
+	fingerNames := map[string]struct{}{
+		"--finger-hint": {}, "-f": {},
+	}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		name, _, foundEq := strings.Cut(a, "=")
 		if foundEq {
 			if _, ok := strictNames[name]; ok {
-				return nil, false, false, fmt.Errorf("invalid %s: use bare --strict, -strict, or -s for strict mode, or omit for non-strict", a)
+				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --strict, -strict, or -s for strict mode, or omit for non-strict", a)
 			}
 			if _, ok := indefNames[name]; ok {
-				return nil, false, false, fmt.Errorf("invalid %s: use bare --indefinite or -i for indefinite mode, or omit", a)
+				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --indefinite or -i for indefinite mode, or omit", a)
+			}
+			if _, ok := fingerNames[name]; ok {
+				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --finger-hint or -f, or omit", a)
 			}
 			rest = append(rest, a)
 			continue
 		}
 		if _, ok := strictNames[a]; ok {
 			if err := rejectBoolLiteralAfterPresenceFlag(args, i, a); err != nil {
-				return nil, false, false, err
+				return nil, false, false, false, err
 			}
 			strict = true
 			continue
 		}
 		if _, ok := indefNames[a]; ok {
 			if err := rejectBoolLiteralAfterPresenceFlag(args, i, a); err != nil {
-				return nil, false, false, err
+				return nil, false, false, false, err
 			}
 			indefinite = true
 			continue
 		}
+		if _, ok := fingerNames[a]; ok {
+			if err := rejectBoolLiteralAfterPresenceFlag(args, i, a); err != nil {
+				return nil, false, false, false, err
+			}
+			fingerHint = true
+			continue
+		}
 		rest = append(rest, a)
 	}
-	return rest, strict, indefinite, nil
+	return rest, strict, indefinite, fingerHint, nil
 }
 
 func rejectBoolLiteralAfterPresenceFlag(args []string, i int, flagToken string) error {
@@ -220,7 +233,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	var noGhost bool
 	fs.BoolVar(&noGhost, "no-ghost", false, "Do not use a ghost overlay from the best prior run of the same text (default is to use one when available).")
 
-	rest, strict, indefinite, err := extractPresenceFlags(args)
+	rest, strict, indefinite, fingerHint, err := extractPresenceFlags(args)
 	if err != nil {
 		return err
 	}
@@ -294,6 +307,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		Source:     source,
 		Strict:     strict,
 		Indefinite: indefinite,
+		FingerHint: fingerHint,
 	}
 
 	var results []model.SessionResult
@@ -712,7 +726,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Quick reference:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--no-ghost]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID")
@@ -756,7 +770,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--no-ghost]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -765,6 +779,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default seed).")
 	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
+	fmt.Fprintln(out, "  -f, --finger-hint    Show US QWERTY finger hints for the next key (bare flag; omit for no hints).")
 	fmt.Fprintln(out, "      --no-ghost       Skip the ghost overlay from history (by default, the best prior run of the same text is used when a typing trace exists).")
 }
 

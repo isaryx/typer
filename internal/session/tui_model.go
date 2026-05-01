@@ -67,6 +67,8 @@ type typingSessionModel struct {
 	width int
 	// indefinite shows a hint that Ctrl+C ends the run with a summary (CLI indefinite mode).
 	indefinite bool
+	// fingerHint enables touch-typing finger hints (US QWERTY diagram).
+	fingerHint bool
 	// replay, when set, holds the prior session for shadow trace and (if showReplayUI) replay chrome.
 	replay *model.SessionResult
 	// showReplayUI is true only for `typer replay`; ghost-from-start uses the normal header without replay lines.
@@ -85,7 +87,7 @@ type typingSessionModel struct {
 	replayClockStart  time.Time
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool) *typingSessionModel {
 	if now == nil {
 		now = time.Now
 	}
@@ -113,6 +115,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		indefinite:   indefinite,
 		replay:       replay,
 		showReplayUI: showReplayUI,
+		fingerHint:   fingerHint,
 
 		shadowTrace:       shadowTrace,
 		shadowStrict:      shadowStrict,
@@ -184,6 +187,13 @@ func (m *typingSessionModel) View() string {
 	}
 	b.WriteString("\n")
 	b.WriteString(m.renderPassageFrame())
+	if m.fingerHint {
+		sf := m.suggestedFinger()
+		if sf != FingerUnknown {
+			b.WriteString("\n\n")
+			b.WriteString(m.renderFingerHandsFrame(sf))
+		}
+	}
 	b.WriteString("\n\n")
 	b.WriteString(m.styles.meta.Width(tw).Render(inputHint))
 	b.WriteString("\n")
@@ -215,6 +225,31 @@ func (m *typingSessionModel) wrapWidth() int {
 		return ui.MaxContentWidth
 	}
 	return tw
+}
+
+// expectedNextKeystroke returns the next key that advances the prompt (caret-aligned).
+func (m *typingSessionModel) expectedNextKeystroke() (rune, bool) {
+	if m.wordIndex >= len(m.words) {
+		return 0, false
+	}
+	target := []rune(m.words[m.wordIndex])
+	typed := []rune(m.current)
+	pos := len(typed)
+	if pos < len(target) {
+		return target[pos], true
+	}
+	if pos > len(target) {
+		return ' ', true
+	}
+	return ' ', true
+}
+
+func (m *typingSessionModel) suggestedFinger() Finger {
+	r, ok := m.expectedNextKeystroke()
+	if !ok {
+		return FingerUnknown
+	}
+	return FingerForRune(r)
 }
 
 // promptInnerWidth is the line width for passage text between "│ " and " │" manual borders.
@@ -873,8 +908,8 @@ func formatReplayDuration(ms int64) string {
 	return fmt.Sprintf("%dh %02dm %02ds", h, mins, secs)
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI)
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

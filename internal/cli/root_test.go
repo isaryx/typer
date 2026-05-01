@@ -27,12 +27,13 @@ const (
 )
 
 type presenceFlagsCase struct {
-	name       string
-	args       []string
-	wantRest   []string
-	wantStrict bool
-	wantIndef  bool
-	wantErr    bool
+	name           string
+	args           []string
+	wantRest       []string
+	wantStrict     bool
+	wantIndef      bool
+	wantFingerHint bool
+	wantErr        bool
 }
 
 func setupTestHistoryStoreFactory(t *testing.T, seed ...model.SessionResult) string {
@@ -70,7 +71,7 @@ func setTestUserDirs(t *testing.T, home string) {
 func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
 	t.Helper()
 
-	gotRest, gotStrict, gotIndef, err := extractPresenceFlags(tc.args)
+	gotRest, gotStrict, gotIndef, gotFingerHint, err := extractPresenceFlags(tc.args)
 	if tc.wantErr {
 		if err == nil {
 			t.Fatalf("extractPresenceFlags: err = nil, want error")
@@ -86,6 +87,9 @@ func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
 	if gotIndef != tc.wantIndef {
 		t.Fatalf("indefinite = %v, want %v", gotIndef, tc.wantIndef)
 	}
+	if gotFingerHint != tc.wantFingerHint {
+		t.Fatalf("fingerHint = %v, want %v", gotFingerHint, tc.wantFingerHint)
+	}
 	if !reflect.DeepEqual(gotRest, tc.wantRest) {
 		t.Fatalf("rest = %#v, want %#v", gotRest, tc.wantRest)
 	}
@@ -94,100 +98,139 @@ func assertExtractPresenceFlagsCase(t *testing.T, tc presenceFlagsCase) {
 func TestExtractPresenceFlags(t *testing.T) {
 	tests := []presenceFlagsCase{
 		{
-			name:       "empty",
-			args:       nil,
-			wantRest:   nil,
-			wantStrict: false,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "empty",
+			args:           nil,
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "no flags",
-			args:       []string{testFlagMode, "words"},
-			wantRest:   []string{testFlagMode, "words"},
-			wantStrict: false,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "no flags",
+			args:           []string{testFlagMode, "words"},
+			wantRest:       []string{testFlagMode, "words"},
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "bare strict",
-			args:       []string{testFlagStrict},
-			wantRest:   nil,
-			wantStrict: true,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "bare strict",
+			args:           []string{testFlagStrict},
+			wantRest:       nil,
+			wantStrict:     true,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "strict then flags",
-			args:       []string{testFlagStrict, testFlagMode, "words"},
-			wantRest:   []string{testFlagMode, "words"},
-			wantStrict: true,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "strict then flags",
+			args:           []string{testFlagStrict, testFlagMode, "words"},
+			wantRest:       []string{testFlagMode, "words"},
+			wantStrict:     true,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "strict shorthand",
-			args:       []string{"-s", "-m", "words"},
-			wantRest:   []string{"-m", "words"},
-			wantStrict: true,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "strict shorthand",
+			args:           []string{"-s", "-m", "words"},
+			wantRest:       []string{"-m", "words"},
+			wantStrict:     true,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "bare indefinite",
-			args:       []string{"--indefinite"},
-			wantRest:   nil,
-			wantStrict: false,
-			wantIndef:  true,
-			wantErr:    false,
+			name:           "bare indefinite",
+			args:           []string{"--indefinite"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      true,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "indef shorthand",
-			args:       []string{"-i", "-m", "w"},
-			wantRest:   []string{"-m", "w"},
-			wantStrict: false,
-			wantIndef:  true,
-			wantErr:    false,
+			name:           "indef shorthand",
+			args:           []string{"-i", "-m", "w"},
+			wantRest:       []string{"-m", "w"},
+			wantStrict:     false,
+			wantIndef:      true,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "strict and indefinite",
-			args:       []string{"-s", "-i", "-w", "3"},
-			wantRest:   []string{"-w", "3"},
-			wantStrict: true,
-			wantIndef:  true,
-			wantErr:    false,
+			name:           "strict and indefinite",
+			args:           []string{"-s", "-i", "-w", "3"},
+			wantRest:       []string{"-w", "3"},
+			wantStrict:     true,
+			wantIndef:      true,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 		{
-			name:       "eq strict",
-			args:       []string{testFlagStrict + "=false"},
-			wantRest:   nil,
-			wantStrict: false,
-			wantIndef:  false,
-			wantErr:    true,
+			name:           "bare finger-hint",
+			args:           []string{"--finger-hint"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: true,
+			wantErr:        false,
 		},
 		{
-			name:       "eq indefinite",
-			args:       []string{"-i=true"},
-			wantRest:   nil,
-			wantStrict: false,
-			wantIndef:  false,
-			wantErr:    true,
+			name:           "finger-hint shorthand",
+			args:           []string{"-f", "-m", "words"},
+			wantRest:       []string{"-m", "words"},
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: true,
+			wantErr:        false,
 		},
 		{
-			name:       "space true after strict",
-			args:       []string{testFlagStrict, "true"},
-			wantRest:   nil,
-			wantStrict: false,
-			wantIndef:  false,
-			wantErr:    true,
+			name:           "eq strict",
+			args:           []string{testFlagStrict + "=false"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        true,
 		},
 		{
-			name:       "word after strict ok",
-			args:       []string{testFlagStrict, "hello"},
-			wantRest:   []string{"hello"},
-			wantStrict: true,
-			wantIndef:  false,
-			wantErr:    false,
+			name:           "eq indefinite",
+			args:           []string{"-i=true"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        true,
+		},
+		{
+			name:           "eq finger-hint",
+			args:           []string{"--finger-hint=false"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        true,
+		},
+		{
+			name:           "space true after strict",
+			args:           []string{testFlagStrict, "true"},
+			wantRest:       nil,
+			wantStrict:     false,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        true,
+		},
+		{
+			name:           "word after strict ok",
+			args:           []string{testFlagStrict, "hello"},
+			wantRest:       []string{"hello"},
+			wantStrict:     true,
+			wantIndef:      false,
+			wantFingerHint: false,
+			wantErr:        false,
 		},
 	}
 	for _, tt := range tests {

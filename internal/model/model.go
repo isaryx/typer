@@ -23,6 +23,7 @@ type SessionOptions struct {
 	Source     string
 	Strict     bool
 	Indefinite bool
+	FingerHint bool
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
@@ -51,6 +52,7 @@ type SessionOptionsSnapshot struct {
 	Source     string `json:"source"`
 	Strict     bool   `json:"strict"`
 	Indefinite bool   `json:"indefinite"`
+	FingerHint bool   `json:"finger_hint,omitempty"`
 }
 
 // OptionsSnapshot returns o as a value suitable for JSON in SessionResult.
@@ -61,6 +63,7 @@ func OptionsSnapshot(o SessionOptions) SessionOptionsSnapshot {
 		Source:     o.Source,
 		Strict:     o.Strict,
 		Indefinite: o.Indefinite,
+		FingerHint: o.FingerHint,
 	}
 }
 
@@ -74,7 +77,7 @@ type SessionMetrics struct {
 }
 
 type SessionResult struct {
-	ID string `json:"id"` // ULID (new sessions); legacy entries may use RFC3339Nano or other strings
+	ID        string         `json:"id"` // ULID (new sessions); legacy entries may use RFC3339Nano or other strings
 	StartedAt time.Time      `json:"started_at"`
 	EndedAt   time.Time      `json:"ended_at"`
 	ElapsedMS int64          `json:"elapsed_ms"`
@@ -91,7 +94,7 @@ type SessionResult struct {
 	WPMSamples        []float64              `json:"wpm_samples,omitempty"`
 	TypingTrace       []ReplayEvent          `json:"typing_trace,omitempty"`
 	// ContentHash is SHA-256 hex of CanonicalPromptContent(Prompt.Content); same text → same hash (any mode).
-	ContentHash       string                 `json:"content_hash,omitempty"`
+	ContentHash string `json:"content_hash,omitempty"`
 }
 
 type HistoryFile struct {
@@ -118,6 +121,7 @@ func SessionOptionsForReplay(r SessionResult) SessionOptions {
 			o.Source = r.Options.Source
 		}
 		o.Strict = r.Options.Strict
+		o.FingerHint = r.Options.FingerHint
 	}
 	return o
 }

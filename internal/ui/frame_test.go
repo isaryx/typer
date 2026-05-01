@@ -24,6 +24,17 @@ func TestTruncateTopCaption(t *testing.T) {
 	}
 }
 
+func TestRenderRoundedTopHalvesWidth(t *testing.T) {
+	border := lipgloss.NewStyle()
+	cap := lipgloss.NewStyle()
+	const middleCells = 40
+	line := RenderRoundedTopHalves("", border, cap, "Left hand", "Right hand", middleCells)
+	ref := RenderRoundedTop("", border, cap, "x", middleCells)
+	if lipgloss.Width(line) != lipgloss.Width(ref) {
+		t.Fatalf("halves width %d != single-caption width %d", lipgloss.Width(line), lipgloss.Width(ref))
+	}
+}
+
 func TestFitBottomCaption(t *testing.T) {
 	cap, d1 := FitBottomCaption("by Henry Ford", 40, 1)
 	if cap == "" {

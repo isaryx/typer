@@ -20,6 +20,8 @@ type tuiStyles struct {
 	inputBad     lipgloss.Style
 	errorMessage lipgloss.Style
 	border       lipgloss.Style // passage frame horizontal rules
+	fingerDim    lipgloss.Style // finger abbrev inactive
+	fingerHi     lipgloss.Style // finger abbrev suggested (bg fill)
 }
 
 func defaultStyles() tuiStyles {
@@ -37,5 +39,10 @@ func defaultStyles() tuiStyles {
 		inputBad:     lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorInputBadFg)).Bold(true),
 		errorMessage: lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorErrorFg)),
 		border:       lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorderHex)),
+		fingerDim:    lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFingerDimFg)),
+		fingerHi: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ui.ColorFingerHighlightFg)).
+			Background(lipgloss.Color(ui.ColorFingerHighlightBg)).
+			Bold(true),
 	}
 }
