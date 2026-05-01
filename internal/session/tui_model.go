@@ -13,11 +13,10 @@ import (
 
 	"typer/internal/model"
 	"typer/internal/scoring"
+	"typer/internal/ui"
 )
 
-// maxWrapWidth caps soft-wrap and lipgloss layout on wide terminals so lines stay
-// readable (roughly 65–95 characters is a common prose band; 88 matches e.g. rustfmt).
-const maxWrapWidth = 88
+const inputHint = "Hint: type the highlighted word, then Space to advance."
 
 // Caret markers are Unicode combining characters (overlay on the glyph; base letter keeps passage color).
 const (
@@ -177,38 +176,18 @@ func (m *typingSessionModel) View() string {
 
 	tw := m.wrapWidth()
 	var b strings.Builder
+	b.WriteString(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
+	b.WriteString("\n")
 	if m.showReplayUI && m.replay != nil {
-		replayTitle := "Replay"
-		if label := formatReplaySessionLabel(m.replay); label != "" {
-			replayTitle = fmt.Sprintf("Replay · %s", label)
-		}
-		b.WriteString(m.styles.title.Width(tw).Render(replayTitle))
-		b.WriteString("\n")
-		b.WriteString(m.styles.meta.Width(tw).Render(formatReplaySummary(m.replay)))
-		b.WriteString("\n\n")
-	}
-	b.WriteString(m.styles.title.Width(tw).Render("Guide: Type the current word, then press Space to advance"))
-	b.WriteString("\n")
-	strictMode := "strict"
-	if !m.strict {
-		strictMode = "non-strict"
-	}
-	sessionMode := m.prompt.Mode
-	if sessionMode == "" {
-		sessionMode = "unknown"
-	}
-	b.WriteString(m.styles.meta.Width(tw).Render(fmt.Sprintf("Mode: %s (%s)  |  Progress: %d/%d", strictMode, sessionMode, m.wordIndex, len(m.words))))
-	b.WriteString("\n")
-	if m.prompt.Author != "" {
-		b.WriteString("\n")
-		b.WriteString(m.styles.meta.Width(tw).Render(fmt.Sprintf("Author: %s", m.prompt.Author)))
+		b.WriteString(m.styles.meta.Width(tw).Render(formatReplayCompactLine(m.replay)))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	prompt := m.renderMergedWords(m.promptInnerWidth())
-	b.WriteString(m.styles.promptBox.Width(tw).Render(prompt))
+	b.WriteString(m.renderPassageFrame())
 	b.WriteString("\n\n")
-	b.WriteString("> ")
+	b.WriteString(m.styles.meta.Width(tw).Render(inputHint))
+	b.WriteString("\n")
+	b.WriteString(m.styles.promptPrefix.Render("> "))
 	b.WriteString(m.renderInputWord())
 	if m.status != "" {
 		b.WriteString("\n")
@@ -229,22 +208,112 @@ func (m *typingSessionModel) termWidth() int {
 	return 80
 }
 
-// wrapWidth is min(terminal width, maxWrapWidth) so content does not stretch across ultra-wide screens.
+// wrapWidth is min(terminal width, ui.MaxContentWidth) so content does not stretch across ultra-wide screens.
 func (m *typingSessionModel) wrapWidth() int {
 	tw := m.termWidth()
-	if tw > maxWrapWidth {
-		return maxWrapWidth
+	if tw > ui.MaxContentWidth {
+		return ui.MaxContentWidth
 	}
 	return tw
 }
 
-// promptInnerWidth is the line width for text inside the bordered prompt (account for left+right border runes).
+// promptInnerWidth is the line width for passage text between "│ " and " │" manual borders.
 func (m *typingSessionModel) promptInnerWidth() int {
-	w := m.wrapWidth() - 2
+	w := m.wrapWidth() - 4
 	if w < 1 {
 		return 1
 	}
 	return w
+}
+
+func (m *typingSessionModel) sessionHeadingLine() string {
+	mode := strings.TrimSpace(m.prompt.Mode)
+	if mode == "" {
+		mode = "unknown"
+	}
+	strictLabel := "strict"
+	if !m.strict {
+		strictLabel = "non-strict"
+	}
+	return fmt.Sprintf("typer · %s · %s", mode, strictLabel)
+}
+
+func (m *typingSessionModel) wordCountTopLabel() string {
+	k, n := m.wordIndex, len(m.words)
+	full := fmt.Sprintf("%d/%d words", k, n)
+	inner := m.wrapWidth() - 2
+	pad := " " + full + " "
+	if lipgloss.Width(pad) <= inner {
+		return full
+	}
+	return fmt.Sprintf("%d/%d", k, n)
+}
+
+func formatByCaption(author string) string {
+	s := strings.TrimSpace(author)
+	if s == "" {
+		return ""
+	}
+	low := strings.ToLower(s)
+	if strings.HasPrefix(low, "by ") {
+		return s
+	}
+	return "by " + s
+}
+
+func formatReplayStatsSegment(sr *model.SessionResult) string {
+	if sr == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		"net %.2f wpm · %s · %.1f%% acc · %d err",
+		sr.Metrics.NetWPM,
+		formatReplayDuration(sr.ElapsedMS),
+		sr.Metrics.Accuracy,
+		sr.Metrics.Errors,
+	)
+}
+
+func formatReplayCompactLine(sr *model.SessionResult) string {
+	if sr == nil {
+		return ""
+	}
+	stats := formatReplayStatsSegment(sr)
+	lbl := formatReplaySessionLabel(sr)
+	if lbl == "" {
+		return "Replay | " + stats
+	}
+	return fmt.Sprintf("Replay · %s | %s", lbl, stats)
+}
+
+func (m *typingSessionModel) renderPassageFrame() string {
+	tw := m.wrapWidth()
+	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
+
+	wordLbl := m.wordCountTopLabel()
+	topLine := ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
+
+	passage := m.renderMergedWords(m.promptInnerWidth())
+	lines := strings.Split(passage, "\n")
+	contentW := m.promptInnerWidth()
+
+	var b strings.Builder
+	b.WriteString(topLine)
+	b.WriteString("\n")
+	for _, pl := range lines {
+		b.WriteString(ui.RenderRoundedSide("", m.styles.border, contentW, pl))
+		b.WriteString("\n")
+	}
+
+	caption := formatByCaption(m.prompt.Author)
+	if caption == "" {
+		b.WriteString(ui.RenderRoundedBottomPlain("", m.styles.border, inner))
+		return b.String()
+	}
+
+	capPlain, d1 := ui.FitBottomCaption(caption, inner, 1)
+	b.WriteString(ui.RenderRoundedBottomCaption("", m.styles.border, m.styles.meta, d1, capPlain, 1))
+	return b.String()
 }
 
 func (m *typingSessionModel) renderWordPiece(i int, w string) string {
@@ -255,10 +324,73 @@ func (m *typingSessionModel) renderWordPiece(i int, w string) string {
 		}
 		return m.styles.completed.Render(w)
 	case i == m.wordIndex:
-		return m.renderActiveWord(w)
+		return m.renderActiveWord(w, i == len(m.words)-1)
 	default:
 		return m.styles.upcoming.Render(w)
 	}
+}
+
+// partialMatchesFullWord is true when the typing lane is still on wordIdx and partial
+// contains every rune of that word (Space not yet applied). Used for both user and ghost.
+func (m *typingSessionModel) partialMatchesFullWord(wordIdx, laneWordIndex int, partial string) bool {
+	if laneWordIndex >= len(m.words) || wordIdx != laneWordIndex {
+		return false
+	}
+	target := m.words[wordIdx]
+	return utf8.RuneCountInString(partial) >= len([]rune(target))
+}
+
+// activeWordInputComplete is true when the user has typed every rune of the
+// active word but has not yet committed with Space.
+func (m *typingSessionModel) activeWordInputComplete() bool {
+	if m.wordIndex >= len(m.words) {
+		return false
+	}
+	return m.partialMatchesFullWord(m.wordIndex, m.wordIndex, m.current)
+}
+
+// shadowWordInputCompleteFor is true when the ghost has typed every rune of words[afterIdx]
+// but the replay has not yet advanced past this word (Space not applied in trace).
+func (m *typingSessionModel) shadowWordInputCompleteFor(afterIdx int) bool {
+	if !m.hasShadowReplay() {
+		return false
+	}
+	return m.partialMatchesFullWord(afterIdx, m.shadowWordIndex, m.shadowCurrent)
+}
+
+// interWordSeparator is the glue between word at afterIdx and word at afterIdx+1.
+// When the user or ghost has finished that word, the corresponding caret sits on this space.
+func (m *typingSessionModel) interWordSeparator(afterIdx int) string {
+	userOnSpace := afterIdx == m.wordIndex && afterIdx < len(m.words) && m.activeWordInputComplete()
+	ghostOnSpace := m.shadowWordInputCompleteFor(afterIdx)
+	if !userOnSpace && !ghostOnSpace {
+		return " "
+	}
+	var marks string
+	if userOnSpace {
+		marks += markUserCaret
+	}
+	if ghostOnSpace {
+		marks += markGhostCaret
+	}
+	if userOnSpace {
+		return m.styles.activePlain.Render(" " + marks)
+	}
+	return m.styles.upcoming.Render(" " + marks)
+}
+
+func (m *typingSessionModel) joinLineParts(parts []string, firstWordIndex int) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for j, part := range parts {
+		if j > 0 {
+			b.WriteString(m.interWordSeparator(firstWordIndex + j - 1))
+		}
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func (m *typingSessionModel) renderWords(lineWidth int) string {
@@ -268,28 +400,32 @@ func (m *typingSessionModel) renderWords(lineWidth int) string {
 	var lines []string
 	var parts []string
 	cur := 0
+	lineStartIdx := 0
 
 	for i, w := range m.words {
 		seg := m.renderWordPiece(i, w)
 		sw := lipgloss.Width(seg)
 		sep := 0
 		if len(parts) > 0 {
-			sep = 1
+			sep = lipgloss.Width(m.interWordSeparator(i - 1))
 		}
 		if cur+sep+sw > lineWidth && len(parts) > 0 {
-			lines = append(lines, strings.Join(parts, " "))
+			lines = append(lines, m.joinLineParts(parts, lineStartIdx))
 			parts = nil
 			cur = 0
 			sep = 0
 		}
+		if len(parts) == 0 {
+			lineStartIdx = i
+		}
 		if len(parts) > 0 {
-			cur++
+			cur += sep
 		}
 		parts = append(parts, seg)
 		cur += sw
 	}
 	if len(parts) > 0 {
-		lines = append(lines, strings.Join(parts, " "))
+		lines = append(lines, m.joinLineParts(parts, lineStartIdx))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -305,27 +441,31 @@ func (m *typingSessionModel) renderMergedWords(lineWidth int) string {
 	var lines []string
 	var parts []string
 	cur := 0
+	lineStartIdx := 0
 	for i, w := range m.words {
 		seg := m.renderMergedWordPiece(i, w)
 		sw := lipgloss.Width(seg)
 		sep := 0
 		if len(parts) > 0 {
-			sep = 1
+			sep = lipgloss.Width(m.interWordSeparator(i - 1))
 		}
 		if cur+sep+sw > lineWidth && len(parts) > 0 {
-			lines = append(lines, strings.Join(parts, " "))
+			lines = append(lines, m.joinLineParts(parts, lineStartIdx))
 			parts = nil
 			cur = 0
 			sep = 0
 		}
+		if len(parts) == 0 {
+			lineStartIdx = i
+		}
 		if len(parts) > 0 {
-			cur++
+			cur += sep
 		}
 		parts = append(parts, seg)
 		cur += sw
 	}
 	if len(parts) > 0 {
-		lines = append(lines, strings.Join(parts, " "))
+		lines = append(lines, m.joinLineParts(parts, lineStartIdx))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -352,13 +492,13 @@ func (m *typingSessionModel) renderMergedWordPiece(i int, w string) string {
 		return m.renderMergedActiveGhostCommitted(w, i)
 	}
 	if uAct {
-		return m.renderActiveWord(w)
+		return m.renderActiveWord(w, i == len(m.words)-1)
 	}
 	if i < m.shadowWordIndex && m.wordIndex < i {
 		return m.renderGhostCompletedAt(i, w)
 	}
 	if gAct {
-		return m.renderShadowActiveWord(w)
+		return m.renderShadowActiveWord(w, i == len(m.words)-1)
 	}
 	return m.styles.upcoming.Render(w)
 }
@@ -373,22 +513,14 @@ func (m *typingSessionModel) renderMergedActiveWord(target string) string {
 	}
 	// Do not delegate to renderActiveWord when cu >= len(tu): that path omits the ghost
 	// overline while the user has finished the runes but not yet pressed Space.
-	displayCG := cg
-	if displayCG >= len(tu) {
-		displayCG = len(tu) - 1
-	}
-	userCol := cu
-	if cu >= len(tu) {
-		userCol = len(tu) - 1
-	}
 	var b strings.Builder
 	for j := 0; j < len(tu); j++ {
 		ch := string(tu[j])
 		marks := ""
-		if j == userCol {
+		if cu < len(tu) && j == cu {
 			marks += markUserCaret
 		}
-		if j == displayCG {
+		if cg < len(tu) && j == cg {
 			marks += markGhostCaret
 		}
 		if j < cu {
@@ -401,8 +533,8 @@ func (m *typingSessionModel) renderMergedActiveWord(target string) string {
 }
 
 // User still typing a word the ghost has already finished — prompt stays target-only (same as a normal active word for user).
-func (m *typingSessionModel) renderMergedActiveGhostCommitted(target string, _ int) string {
-	return m.renderActiveWord(target)
+func (m *typingSessionModel) renderMergedActiveGhostCommitted(target string, wordIdx int) string {
+	return m.renderActiveWord(target, wordIdx == len(m.words)-1)
 }
 
 func (m *typingSessionModel) renderGhostCompletedAt(_ int, w string) string {
@@ -410,7 +542,7 @@ func (m *typingSessionModel) renderGhostCompletedAt(_ int, w string) string {
 	return m.styles.upcoming.Render(w)
 }
 
-func (m *typingSessionModel) renderActiveWord(target string) string {
+func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) string {
 	targetRunes := []rune(target)
 	if len(targetRunes) == 0 {
 		return m.styles.active.Render(target)
@@ -418,7 +550,12 @@ func (m *typingSessionModel) renderActiveWord(target string) string {
 
 	cursor := utf8.RuneCountInString(m.current)
 	if cursor >= len(targetRunes) {
-		return m.styles.active.Render(target)
+		var b strings.Builder
+		b.WriteString(m.styles.activeTyped.Render(string(targetRunes)))
+		if isLastWord {
+			b.WriteString(m.styles.activePlain.Render(" " + markUserCaret))
+		}
+		return b.String()
 	}
 
 	var b strings.Builder
@@ -477,21 +614,28 @@ func (m *typingSessionModel) hasShadowReplay() bool {
 	return len(m.shadowTrace) > 0
 }
 
-// Ghost alone on this word: identical styling on every rune; only the overline combining mark moves.
-func (m *typingSessionModel) renderShadowActiveWord(target string) string {
+// Ghost alone on this word: overline moves with the ghost caret; when the ghost has
+// finished all runes, the caret sits on the following space (see interWordSeparator).
+func (m *typingSessionModel) renderShadowActiveWord(target string, isLastWord bool) string {
 	tu := []rune(target)
 	cg := len([]rune(m.shadowCurrent))
 	if len(tu) == 0 {
 		return m.styles.upcoming.Render(target)
 	}
-	caret := cg
-	if caret >= len(tu) {
-		caret = len(tu) - 1
+	if cg >= len(tu) {
+		var b strings.Builder
+		for j := 0; j < len(tu); j++ {
+			b.WriteString(m.styles.upcoming.Render(string(tu[j])))
+		}
+		if isLastWord {
+			b.WriteString(m.styles.upcoming.Render(" " + markGhostCaret))
+		}
+		return b.String()
 	}
 	var b strings.Builder
 	for j := 0; j < len(tu); j++ {
 		ch := string(tu[j])
-		if j == caret {
+		if j == cg {
 			b.WriteString(m.styles.upcoming.Render(ch + markGhostCaret))
 		} else {
 			b.WriteString(m.styles.upcoming.Render(ch))
@@ -703,19 +847,6 @@ func formatReplaySessionLabel(sr *model.SessionResult) string {
 		return sr.StartedAt.Local().Format("2006-01-02 15:04:05")
 	}
 	return ""
-}
-
-func formatReplaySummary(prev *model.SessionResult) string {
-	if prev == nil {
-		return ""
-	}
-	return fmt.Sprintf(
-		"Previous run: net %.2f wpm · %s · %.1f%% acc · %d err",
-		prev.Metrics.NetWPM,
-		formatReplayDuration(prev.ElapsedMS),
-		prev.Metrics.Accuracy,
-		prev.Metrics.Errors,
-	)
 }
 
 func formatReplayDuration(ms int64) string {

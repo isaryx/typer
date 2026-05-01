@@ -1,26 +1,15 @@
 package session
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
 
-// Palette used by the typing TUI. Numbers are ANSI 256-color indices except
-// where noted; keep them grouped here so themes are easy to swap.
-const (
-	colorTitle        = "70"      // muted green
-	colorMeta         = "245"     // dim gray
-	colorBorder       = "#ffffff" // pure white
-	colorCompletedOK  = "70"      // muted green
-	colorCompletedBad = "203"     // salmon red
-	colorActiveFg     = "45"      // bright cyan
-	colorUpcoming     = "252"     // light gray
-	colorInputFg      = "229"     // pale yellow
-	colorInputBadFg   = "203"     // salmon red
-	colorErrorFg      = "203"     // salmon red
+	"typer/internal/ui"
 )
 
 type tuiStyles struct {
 	title        lipgloss.Style
 	meta         lipgloss.Style
-	promptBox    lipgloss.Style
+	promptPrefix lipgloss.Style
 	completed    lipgloss.Style
 	completedBad lipgloss.Style
 	active       lipgloss.Style
@@ -30,21 +19,23 @@ type tuiStyles struct {
 	input        lipgloss.Style
 	inputBad     lipgloss.Style
 	errorMessage lipgloss.Style
+	border       lipgloss.Style // passage frame horizontal rules
 }
 
 func defaultStyles() tuiStyles {
 	return tuiStyles{
-		title:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorTitle)),
-		meta:         lipgloss.NewStyle().Foreground(lipgloss.Color(colorMeta)),
-		promptBox:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color(colorBorder)),
-		completed:    lipgloss.NewStyle().Foreground(lipgloss.Color(colorCompletedOK)),
-		completedBad: lipgloss.NewStyle().Foreground(lipgloss.Color(colorCompletedBad)).Bold(true),
-		active:       lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color(colorActiveFg)),
-		activePlain:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorActiveFg)),
-		activeTyped:  lipgloss.NewStyle().Foreground(lipgloss.Color(colorActiveFg)),
-		upcoming:     lipgloss.NewStyle().Foreground(lipgloss.Color(colorUpcoming)),
-		input:        lipgloss.NewStyle().Foreground(lipgloss.Color(colorInputFg)),
-		inputBad:     lipgloss.NewStyle().Foreground(lipgloss.Color(colorInputBadFg)).Bold(true),
-		errorMessage: lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorFg)),
+		title:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ui.ColorTitle)),
+		meta:         lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorMeta)),
+		promptPrefix: lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorMeta)),
+		completed:    lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorCompletedOK)),
+		completedBad: lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorCompletedBad)).Bold(true),
+		active:       lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color(ui.ColorActiveFg)),
+		activePlain:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ui.ColorActiveFg)),
+		activeTyped:  lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorActiveFg)),
+		upcoming:     lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorUpcoming)),
+		input:        lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorInputFg)),
+		inputBad:     lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorInputBadFg)).Bold(true),
+		errorMessage: lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorErrorFg)),
+		border:       lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorderHex)),
 	}
 }

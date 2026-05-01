@@ -359,7 +359,7 @@ func TestExecuteResetProgressRejectsExtraArgs(t *testing.T) {
 
 func TestPrintMetricsTableIncludesAdjustedWPM(t *testing.T) {
 	var out bytes.Buffer
-	printMetricsTable(&out, "Session result", 72.0, 68.0, 64.0, 88.9, 91.2, 3, 27_000, false)
+	printMetricsTable(&out, "Session stats", 72.0, 68.0, 64.0, 88.9, 91.2, 3, 27_000, false)
 	got := out.String()
 	if !strings.Contains(got, "Adjusted WPM") {
 		t.Fatalf("expected Adjusted WPM row, got %q", got)
@@ -383,7 +383,7 @@ func TestPrintMetricsTableSummaryIncludesAvgAdjustedWPM(t *testing.T) {
 
 func TestPrintMetricsTableIncludesConsistencyWhenZero(t *testing.T) {
 	var out bytes.Buffer
-	printMetricsTable(&out, "Session result", 50.0, 45.0, 40.0, 90.0, 0, 2, 8_000, false)
+	printMetricsTable(&out, "Session stats", 50.0, 45.0, 40.0, 90.0, 0, 2, 8_000, false)
 	got := out.String()
 	if !strings.Contains(got, "Pace stability") {
 		t.Fatalf("expected Pace stability row, got %q", got)

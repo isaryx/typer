@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"typer/internal/model"
+	"typer/internal/ui"
 )
 
 const helloWorldPrompt = "hello world"
@@ -170,8 +171,8 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		false,
 	)
 	m.width = 200
-	if got := m.wrapWidth(); got != maxWrapWidth {
-		t.Fatalf("wrapWidth(200) = %d, want %d", got, maxWrapWidth)
+	if got := m.wrapWidth(); got != ui.MaxContentWidth {
+		t.Fatalf("wrapWidth(200) = %d, want %d", got, ui.MaxContentWidth)
 	}
 	m.width = 40
 	if got := m.wrapWidth(); got != 40 {
@@ -189,8 +190,8 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		false,
 	)
 	got := m.View()
-	if !strings.Contains(got, "Mode: non-strict (words)") {
-		t.Fatalf("expected mode label in header, got %q", got)
+	if !strings.Contains(got, "typer · words · non-strict") {
+		t.Fatalf("expected session heading in view, got %q", got)
 	}
 }
 
@@ -429,7 +430,7 @@ func TestViewReplayTitleShowsSessionID(t *testing.T) {
 		true,
 	)
 	v := m.View()
-	want := "Replay · " + sid
+	want := "Replay · " + sid + " | net 10.00 wpm"
 	if !strings.Contains(v, want) {
 		t.Fatalf("expected %q in view, got:\n%s", want, v)
 	}
@@ -452,8 +453,8 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
 		t.Fatalf("ghost-only session should not show replay chrome, got:\n%s", v)
 	}
-	if !strings.Contains(v, "Guide: Type the current word") {
-		t.Fatal("expected normal start guide line")
+	if !strings.Contains(v, inputHint) {
+		t.Fatal("expected hint above input")
 	}
 }
 

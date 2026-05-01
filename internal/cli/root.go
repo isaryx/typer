@@ -20,15 +20,16 @@ import (
 	"typer/internal/session"
 	"typer/internal/storage"
 	"typer/internal/text"
+	"typer/internal/ui"
 	"typer/internal/version"
 )
 
 const noHistoryMessage = "No history yet. Run `typer start` first."
 
-// Replay comparison line colors (match TUI palette: muted green / salmon red).
+// Replay comparison line colors (shared TUI palette).
 var (
-	replayDeltaGood = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
-	replayDeltaBad  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+	replayDeltaGood = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorTitle))
+	replayDeltaBad  = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorCompletedBad))
 )
 
 const resetProgressFlag = "--reset-progress"
@@ -416,13 +417,13 @@ func printReplayComparison(out io.Writer, previous, current model.SessionResult)
 		previous.Metrics.Errors, current.Metrics.Errors)
 	switch {
 	case deltaMS < 0:
-		timePhrase := replayDeltaGood.Render(fmt.Sprintf("%s faster", formatElapsedMS(-deltaMS)))
-		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+		timePhrase := replayDeltaGood.Render(fmt.Sprintf("%s faster", ui.FormatElapsedMS(-deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, ui.FormatElapsedMS(previous.ElapsedMS), ui.FormatElapsedMS(current.ElapsedMS))
 	case deltaMS > 0:
-		timePhrase := replayDeltaBad.Render(fmt.Sprintf("%s slower", formatElapsedMS(deltaMS)))
-		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, formatElapsedMS(previous.ElapsedMS), formatElapsedMS(current.ElapsedMS))
+		timePhrase := replayDeltaBad.Render(fmt.Sprintf("%s slower", ui.FormatElapsedMS(deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, ui.FormatElapsedMS(previous.ElapsedMS), ui.FormatElapsedMS(current.ElapsedMS))
 	default:
-		fmt.Fprintf(out, "  Time:     same  (%s)\n", formatElapsedMS(current.ElapsedMS))
+		fmt.Fprintf(out, "  Time:     same  (%s)\n", ui.FormatElapsedMS(current.ElapsedMS))
 	}
 }
 
@@ -501,67 +502,11 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 
 func printOneSessionResult(out io.Writer, r model.SessionResult) {
 	m := r.Metrics
-	printMetricsTable(out, "Session result", m.GrossWPM, m.NetWPM, m.AdjustedWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
+	printMetricsTable(out, "Session stats", m.GrossWPM, m.NetWPM, m.AdjustedWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
 }
 
 func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
-	fmt.Fprintln(out)
-	const (
-		boxTopFmt      = "  ╭%s╮\n"
-		boxBottomFmt   = "  ╰%s╯\n"
-		boxInnerWidth  = 60
-		boxPaddingCols = 2
-		twoColumnFmt   = "%-16s %-10s  %-14s %s"
-	)
-	boxInnerFmt := fmt.Sprintf("  │ %%-%ds │\n", boxInnerWidth)
-	horizontalBar := strings.Repeat("─", boxInnerWidth+boxPaddingCols)
-	if summary {
-		fmt.Fprintf(out, boxTopFmt, horizontalBar)
-		fmt.Fprintf(out, boxInnerFmt, heading)
-		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg gross WPM", fmt.Sprintf("%.2f", gross), "Avg accuracy", fmt.Sprintf("%.2f%%", acc)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Avg pace stability", fmt.Sprintf("%.2f", cons)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg net WPM", fmt.Sprintf("%.2f", net), "Total errors", fmt.Sprintf("%d", errCount)))
-		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Total time: %s", formatElapsedMS(elapsedMS)))
-		fmt.Fprintf(out, boxBottomFmt, horizontalBar)
-	} else {
-		fmt.Fprintf(out, boxTopFmt, horizontalBar)
-		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, "SPEED                        CONTROL")
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Gross WPM", fmt.Sprintf("%.2f", gross), "Accuracy", fmt.Sprintf("%.2f%%", acc)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Adjusted WPM", fmt.Sprintf("%.2f", adjusted), "Pace stability", fmt.Sprintf("%.2f", cons)))
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Net WPM", fmt.Sprintf("%.2f", net), "Errors", fmt.Sprintf("%d", errCount)))
-		fmt.Fprintf(out, boxInnerFmt, "")
-		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf("Duration: %s", formatElapsedMS(elapsedMS)))
-		fmt.Fprintf(out, boxBottomFmt, horizontalBar)
-	}
-	fmt.Fprintln(out)
-}
-
-func formatElapsedMS(ms int64) string {
-	if ms < 0 {
-		return "0 ms"
-	}
-	if ms < 1000 {
-		return fmt.Sprintf("%d ms", ms)
-	}
-	secs := ms / 1000
-	if secs < 60 {
-		if ms < 10_000 {
-			return fmt.Sprintf("%.1f s", float64(ms)/1000)
-		}
-		return fmt.Sprintf("%d s", secs)
-	}
-	mins := secs / 60
-	secs %= 60
-	if mins < 60 {
-		return fmt.Sprintf("%dm %02ds", mins, secs)
-	}
-	h := mins / 60
-	mins %= 60
-	return fmt.Sprintf("%dh %02dm %02ds", h, mins, secs)
+	ui.PrintMetricsTable(out, heading, gross, net, adjusted, acc, cons, errCount, elapsedMS, summary)
 }
 
 func runSet(args []string, stdout io.Writer) error {
