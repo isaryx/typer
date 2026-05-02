@@ -24,6 +24,7 @@ func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -47,6 +48,7 @@ func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.appendRunes([]rune("x"))
 	if m.current != "" {
@@ -79,6 +81,7 @@ func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -105,6 +108,7 @@ func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "hello"
 	m.commitCurrentWord()
@@ -128,6 +132,7 @@ func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.appendRunes([]rune("hx"))
 	if m.totalKeystrokes != 2 {
@@ -152,6 +157,7 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.appendRunes([]rune("hxllo"))
 	m.commitCurrentWord()
@@ -212,6 +218,7 @@ func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.width = 16
 	out := m.renderWords(14)
@@ -231,6 +238,7 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.width = 200
 	if got := m.wrapWidth(); got != ui.MaxContentWidth {
@@ -253,6 +261,7 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	got := m.View()
 	if !strings.Contains(got, "typer · words · non-strict") {
@@ -271,6 +280,7 @@ func TestViewHideHintOmitsHintLine(t *testing.T) {
 		false,
 		false,
 		true,
+		model.InputPlacement{},
 	)
 	got := m.View()
 	if strings.Contains(got, inputHint) {
@@ -292,6 +302,7 @@ func TestViewNoInputPlacesHintUnderHeadingHidesPrompt(t *testing.T) {
 		false,
 		true,
 		false,
+		model.InputPlacement{},
 	)
 	got := m.View()
 	if strings.Contains(got, "> ") {
@@ -324,6 +335,7 @@ func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	if !m.startedAt.IsZero() {
 		t.Fatalf("expected zero startedAt before typing, got %v", m.startedAt)
@@ -354,6 +366,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.aborted = true
 	m.endedAt = now.UTC()
@@ -378,6 +391,7 @@ func TestInitReturnsNilCommand(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	if cmd := m.Init(); cmd != nil {
 		t.Fatalf("expected nil init command, got %v", cmd)
@@ -395,6 +409,7 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "hé"
 	gotModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
@@ -419,6 +434,7 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "hello"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
@@ -449,6 +465,7 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.current = "go"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -474,6 +491,7 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 				false,
 				false,
 				false,
+				model.InputPlacement{},
 			)
 			gotModel, cmd := m.Update(tea.KeyMsg{Type: key})
 			updated := gotModel.(*typingSessionModel)
@@ -503,6 +521,7 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.wordIndex = 1
 	m.current = "w"
@@ -527,6 +546,7 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.wordIndex = 0
 	m.current = "hello"
@@ -574,6 +594,7 @@ func TestViewReplayTitleShowsSessionID(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	v := m.View()
 	want := "Replay · " + sid + " | net 10.00 wpm"
@@ -597,6 +618,7 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 		false,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	v := m.View()
 	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
@@ -618,6 +640,7 @@ func TestViewFingerHintShowsFramedHands(t *testing.T) {
 		true,
 		false,
 		false,
+		model.InputPlacement{},
 	)
 	m.width = 88
 	v := m.View()
@@ -641,5 +664,94 @@ func TestRemoveLastRune(t *testing.T) {
 	}
 	if got := removeLastRune("hé"); got != "h" {
 		t.Fatalf("unicode input: got %q", got)
+	}
+}
+
+func TestViewInputLineTopBeforePassageFrame(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalTop},
+	)
+	m.width = 80
+	v := m.View()
+	idxPrompt := strings.Index(v, "> ")
+	idxFrame := strings.Index(v, "╭")
+	if idxPrompt < 0 || idxFrame < 0 || idxPrompt >= idxFrame {
+		t.Fatalf("expected > before frame: idxPrompt=%d idxFrame=%d", idxPrompt, idxFrame)
+	}
+}
+
+func TestViewInputLineBottomAfterPassageFrame(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+	)
+	m.width = 80
+	v := m.View()
+	idxPrompt := strings.Index(v, "> ")
+	idxFrame := strings.Index(v, "╭")
+	if idxPrompt < 0 || idxFrame < 0 || idxPrompt <= idxFrame {
+		t.Fatalf("expected > after frame start: idxFrame=%d idxPrompt=%d", idxFrame, idxPrompt)
+	}
+}
+
+func TestViewInputLineCenterPlacementRenders(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalBottom, H: model.InputHorizontalCenter},
+	)
+	m.width = 120
+	v := m.View()
+	if !strings.Contains(v, "> ") {
+		t.Fatalf("expected input line in view:\n%s", v)
+	}
+}
+
+func TestViewHidesInputLineWhenSessionComplete(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalTop, H: model.InputHorizontalLeft},
+	)
+	m.width = 80
+	m.wordIndex = 1
+	m.current = ""
+	if !m.isDone() {
+		t.Fatal("model should be in completed state")
+	}
+	v := m.View()
+	if strings.Contains(v, "> ") {
+		t.Fatalf("expected no input line when session complete, got:\n%s", v)
 	}
 }

@@ -20,18 +20,18 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	fs.SetOutput(io.Discard)
 
 	var mode string
-	fs.StringVar(&mode, "mode", "quotes", "Text mode: passages|p, words|w, or quotes|q.")
-	fs.StringVar(&mode, "m", "quotes", "Shorthand for --mode (same values as --mode).")
+	fs.StringVar(&mode, "mode", "quotes", "passages|p, words|w, quotes|q.")
+	fs.StringVar(&mode, "m", "quotes", "Shorthand for --mode.")
 	var words int
-	fs.IntVar(&words, "words", 15, "Number of words per prompt (words mode only).")
+	fs.IntVar(&words, "words", 15, "Words per prompt (words mode).")
 	fs.IntVar(&words, "w", 15, "Shorthand for --words.")
 	var source string
-	fs.StringVar(&source, "source", "seed", "Quotes mode fetch policy: auto|remote|cache|seed.")
+	fs.StringVar(&source, "source", "seed", "Quotes: auto|remote|cache|seed.")
 
 	var noGhost bool
-	fs.BoolVar(&noGhost, "no-ghost", false, "Do not use a ghost overlay from the best prior run of the same text (default is to use one when available).")
+	fs.BoolVar(&noGhost, "no-ghost", false, "Skip ghost overlay from best prior run.")
 	var noInput bool
-	fs.BoolVar(&noInput, "no-input", false, "Hide the input line; show the typing hint under the title.")
+	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
 
 	rest, strict, indefinite, fingerHint, err := extractPresenceFlags(args)
 	if err != nil {
@@ -89,6 +89,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		return err
 	}
 	opts.HideHint = !settings.HintVisible()
+	opts.InputPlacement = settings.InputPlacement()
 	provider, err := text.NewProvider(canonMode, cache, settings.WordsFile, settings.PassagesFile)
 	if err != nil {
 		return err

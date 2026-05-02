@@ -361,7 +361,7 @@ func TestRunStartHelpShortCircuits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runStart -h: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "Run an interactive typing session") {
+	if !strings.Contains(stdout.String(), "Interactive session") {
 		t.Fatalf("expected start help, got %q", stdout.String())
 	}
 	if !strings.Contains(stdout.String(), "(default quotes)") {
@@ -493,7 +493,7 @@ func TestRunSetRequiresAtLeastOneFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected runSet to fail without flags")
 	}
-	if !strings.Contains(err.Error(), "set requires --words-file, --passages-file, and/or --show-hint") {
+	if !strings.Contains(err.Error(), "set requires --words-file, --passages-file, --show-hint, and/or --input-position") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
@@ -615,6 +615,41 @@ func TestRunSetShowHintRejectsInvalid(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), `--show-hint must be "on" or "off"`) {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
+func TestRunSetInputPositionOnlyPersists(t *testing.T) {
+	home := t.TempDir()
+	setTestUserDirs(t, home)
+
+	var out bytes.Buffer
+	if err := runSet([]string{"--input-position", "tc"}, &out); err != nil {
+		t.Fatalf("runSet: %v", err)
+	}
+	if !strings.Contains(out.String(), "Input position: top-center") {
+		t.Fatalf("expected confirmation, got %q", out.String())
+	}
+	store, err := storage.NewSettingsStore()
+	if err != nil {
+		t.Fatalf("NewSettingsStore: %v", err)
+	}
+	settings, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load settings: %v", err)
+	}
+	if settings.InputPosition != "top-center" {
+		t.Fatalf("InputPosition = %q, want top-center", settings.InputPosition)
+	}
+}
+
+func TestRunSetInputPositionRejectsInvalid(t *testing.T) {
+	var out bytes.Buffer
+	err := runSet([]string{"--input-position", "sideways"}, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "input position") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
@@ -798,7 +833,7 @@ func TestHelpPrintersIncludeUsage(t *testing.T) {
 		var out bytes.Buffer
 		printSetHelp(&out)
 		got := out.String()
-		if !strings.Contains(got, "typer set") || !strings.Contains(got, "--words-file") {
+		if !strings.Contains(got, "typer set") || !strings.Contains(got, "--words-file") || !strings.Contains(got, "--input-position") {
 			t.Fatalf("unexpected set help: %q", got)
 		}
 	})

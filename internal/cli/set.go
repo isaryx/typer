@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"typer/internal/model"
 	"typer/internal/storage"
 )
 
@@ -16,9 +17,10 @@ func runSet(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("set", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	wordsFile := fs.String("words-file", "", "Path to a newline-separated custom word list.")
-	passagesFile := fs.String("passages-file", "", "Path to a blank-line-separated custom passages file.")
-	showHint := fs.String("show-hint", "", `Typing hint under the title: "on" or "off" (default when unset: on).`)
+	wordsFile := fs.String("words-file", "", "Words mode word list file.")
+	passagesFile := fs.String("passages-file", "", "Passages mode passages file.")
+	showHint := fs.String("show-hint", "", `Show or hide hint: on|off (default on).`)
+	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc).`)
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printSetHelp(stdout)
@@ -46,8 +48,17 @@ func runSet(args []string, stdout io.Writer) error {
 	default:
 		return fmt.Errorf(`set: --show-hint must be "on" or "off", got %q`, strings.TrimSpace(*showHint))
 	}
-	if wf == "" && pf == "" && showHintPtr == nil {
-		return errors.New("set requires --words-file, --passages-file, and/or --show-hint")
+	inputPosArg := strings.TrimSpace(*inputPosition)
+	var inputPlacement *model.InputPlacement
+	if inputPosArg != "" {
+		p, err := model.ParseInputPosition(inputPosArg)
+		if err != nil {
+			return fmt.Errorf("set: %w", err)
+		}
+		inputPlacement = &p
+	}
+	if wf == "" && pf == "" && showHintPtr == nil && inputPlacement == nil {
+		return errors.New("set requires --words-file, --passages-file, --show-hint, and/or --input-position")
 	}
 
 	validateFile := func(label, path string) (string, error) {
@@ -91,6 +102,9 @@ func runSet(args []string, stdout io.Writer) error {
 	if showHintPtr != nil {
 		settings.ShowHint = showHintPtr
 	}
+	if inputPlacement != nil {
+		settings.InputPosition = inputPlacement.CanonicalString()
+	}
 
 	if err := settingsStore.Save(settings); err != nil {
 		return err
@@ -108,6 +122,9 @@ func runSet(args []string, stdout io.Writer) error {
 		} else {
 			fmt.Fprintln(stdout, "Typing hint: off")
 		}
+	}
+	if inputPlacement != nil {
+		fmt.Fprintf(stdout, "Input position: %s\n", settings.InputPosition)
 	}
 	return nil
 }

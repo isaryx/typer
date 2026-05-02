@@ -17,7 +17,7 @@ func runHistory(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("history", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	last := fs.Int("last", 20, "Maximum number of recent sessions to list.")
+	last := fs.Int("last", 20, "How many recent sessions to list (default 20).")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printHistoryHelp(stdout)
@@ -67,7 +67,7 @@ func runStats(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("stats", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	last := fs.Int("last", 20, "Maximum number of recent sessions to analyze.")
+	last := fs.Int("last", 20, "How many sessions to include (default 20).")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printStatsHelp(stdout)

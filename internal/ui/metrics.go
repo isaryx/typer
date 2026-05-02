@@ -118,8 +118,10 @@ func printMetricsTableLipgloss(out io.Writer, heading string, gross, net, adjust
 	}
 	b.WriteString(RenderRoundedBottomPlain("", border, mw))
 
-	fmt.Fprintln(out, b.String())
-	fmt.Fprintln(out)
+	// Lipgloss strings may end with a stray newline; Fprintln would then add another,
+	// yielding multiple blank lines after the box. Normalize to one newline after ╰, then one blank line.
+	s := strings.TrimRight(b.String(), "\n")
+	fmt.Fprintln(out, s)
 }
 
 // FormatElapsedMS renders elapsed milliseconds for metrics and replay summaries.

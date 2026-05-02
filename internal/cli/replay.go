@@ -26,13 +26,13 @@ var (
 func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	fs := flag.NewFlagSet("replay", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	id := fs.String("id", "", "Session id (from `typer history`, id=...).")
-	nth := fs.Int("nth", 0, "Replay the n-th newest session (1 = most recent).")
+	id := fs.String("id", "", "Session id from typer history.")
+	nth := fs.Int("nth", 0, "Replay Nth newest (1 = newest).")
 	var last bool
-	fs.BoolVar(&last, "last", false, "Replay the most recent session.")
+	fs.BoolVar(&last, "last", false, "Newest session.")
 	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
 	var noInput bool
-	fs.BoolVar(&noInput, "no-input", false, "Hide the input line; show the typing hint under the title.")
+	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printReplayHelp(stdout)
@@ -90,6 +90,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	opts := model.SessionOptionsForReplay(baseline)
 	opts.NoInput = noInput
 	opts.HideHint = !settings.HintVisible()
+	opts.InputPlacement = settings.InputPlacement()
 	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
 	if err != nil {
 		return err

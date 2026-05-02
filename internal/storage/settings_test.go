@@ -65,6 +65,13 @@ func TestSettingsStoreSaveLoadPassagesFile(t *testing.T) {
 	}
 }
 
+func TestAppSettingsInputPlacementDefault(t *testing.T) {
+	var a AppSettings
+	if p := a.InputPlacement(); p.CanonicalString() != "top-left" {
+		t.Fatalf("default InputPlacement: got %q", p.CanonicalString())
+	}
+}
+
 func TestAppSettingsHintVisible(t *testing.T) {
 	var a AppSettings
 	if !a.HintVisible() {
@@ -90,6 +97,23 @@ func TestSettingsStoreLoadMissingFileReturnsDefaults(t *testing.T) {
 	}
 	if got != (AppSettings{}) {
 		t.Fatalf("expected zero-value settings, got %#v", got)
+	}
+}
+
+func TestSettingsStoreSaveLoadInputPosition(t *testing.T) {
+	store := NewSettingsStoreAt(filepath.Join(t.TempDir(), settingsJSONFile))
+	if err := store.Save(AppSettings{InputPosition: "top-right"}); err != nil {
+		t.Fatalf("save settings: %v", err)
+	}
+	got, err := store.Load()
+	if err != nil {
+		t.Fatalf("load settings: %v", err)
+	}
+	if got.InputPosition != "top-right" {
+		t.Fatalf("InputPosition = %q, want top-right", got.InputPosition)
+	}
+	if p := got.InputPlacement(); p.CanonicalString() != "top-right" {
+		t.Fatalf("InputPlacement: got %q", p.CanonicalString())
 	}
 }
 

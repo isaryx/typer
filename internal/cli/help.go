@@ -3,111 +3,127 @@ package cli
 import (
 	"fmt"
 	"io"
+	"text/tabwriter"
 
 	"typer/internal/model"
 	"typer/internal/version"
 )
 
 func printHelp(out io.Writer) {
-	fmt.Fprintf(out, "typer %s — terminal typing practice\n", version.Version)
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer <command> [arguments]")
-	fmt.Fprintln(out, "  typer --reset-progress       # clear saved history (type y/yes to confirm)")
-	fmt.Fprintln(out, "  typer [arguments]              # same as: typer start [arguments] when the first token begins with \"-\"")
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Commands:")
-	fmt.Fprintln(out, "  start        Run an interactive typing session.")
-	fmt.Fprintln(out, "  set          Save custom corpus paths and typing hint preference.")
-	fmt.Fprintln(out, "  history      List recent sessions from local history.")
-	fmt.Fprintln(out, "  replay       Re-run a history session; compare metrics (-l, --nth, --id).")
-	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
-	fmt.Fprintln(out, "  credits      Show data source credits.")
-	fmt.Fprintln(out, "  key-press    Show key presses.")
-	fmt.Fprintln(out, "  version      Print the installed typer version.")
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Quick reference:")
-	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
-	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH] [--show-hint on|off]")
-	fmt.Fprintln(out, "  typer history [--last N]")
-	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID [--no-input]")
-	fmt.Fprintln(out, "  typer stats [--last N]")
-	fmt.Fprintln(out, "  typer credits")
-	fmt.Fprintln(out, "  typer key-press")
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Per-command help:")
-	fmt.Fprintln(out, "  typer start -h | typer start --help")
-	fmt.Fprintln(out, "  typer set -h   | typer set --help")
-	fmt.Fprintln(out, "  typer history -h | typer stats -h | typer replay -h")
-	fmt.Fprintln(out, "  typer key-press -h | typer key-press --help")
-	fmt.Fprintln(out, "  typer --reset-progress         # type y/yes to confirm on the prompt")
+	fmt.Fprintf(out, "typer %s — terminal typing practice\n\n", version.Version)
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  typer <command> [arguments]")
+	fmt.Fprintf(w, "  %s\t%s\n", "typer --reset-progress", "Clear history (confirm y/yes).")
+	fmt.Fprintf(w, "  %s\t%s\n", "typer [flags...]", "Same as typer start when the first arg is a flag.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	cmds := []struct {
+		name string
+		desc string
+	}{
+		{"start", "Interactive typing session."},
+		{"set", "Save corpus, hint, input layout (see typer set -h)."},
+		{"history", "List recent sessions."},
+		{"replay", "Replay a saved session; compare metrics."},
+		{"stats", "Stats over recent sessions."},
+		{"credits", "Data sources and libraries."},
+		{"key-press", "Echo keys (demo)."},
+		{"version", "Print version."},
+	}
+	for _, c := range cmds {
+		fmt.Fprintf(w, "  %s\t%s\n", c.name, c.desc)
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Subcommand help:")
+	fmt.Fprintln(w, "  typer <command> -h    Full flags for that command (same as --help).")
+	w.Flush()
 }
 
 func printStartHelp(out io.Writer) {
-	fmt.Fprintln(out, "Run an interactive typing session.")
-	fmt.Fprintln(out, "When local history has a best prior run of the same text with a typing trace, it is used as the ghost overlay unless --no-ghost.")
+	fmt.Fprintln(out, "Interactive session. Ghost uses your best prior run of the same text unless --no-ghost.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
-	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
+	fmt.Fprintln(out, "  typer [same flags...]            # omit \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "  -m, --mode string    Text mode: passages|p, words|w, or quotes|q (default quotes).")
-	fmt.Fprintf(out, "  -w, --words int      Words per prompt in words mode, 1..%d (default 15).\n", model.MaxWordsPerPrompt)
-	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default seed).")
-	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
-	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
-	fmt.Fprintln(out, "  -f, --finger-hint    Show US QWERTY finger hints for the next key (bare flag; omit for no hints).")
-	fmt.Fprintln(out, "      --no-ghost       Skip the ghost overlay from history (by default, the best prior run of the same text is used when a typing trace exists).")
-	fmt.Fprintln(out, "      --no-input       Hide the input line; show the typing hint directly under the title.")
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintf(w, "  %s\t%s\n", "-m, --mode string", "passages|p, words|w, quotes|q (default quotes).")
+	fmt.Fprintf(w, "  %s\t%s\n", "-w, --words int", fmt.Sprintf("Words per prompt (words mode), 1..%d (default 15).", model.MaxWordsPerPrompt))
+	fmt.Fprintf(w, "  %s\t%s\n", "--source string", "Quotes only: auto|remote|cache|seed (default seed).")
+	fmt.Fprintf(w, "  %s\t%s\n", "-s, --strict", "Wrong character does not advance (bare flag).")
+	fmt.Fprintf(w, "  %s\t%s\n", "-i, --indefinite", "Run another session after each finish until Ctrl+C (bare flag).")
+	fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "QWERTY finger diagram for next key (bare flag).")
+	fmt.Fprintf(w, "  %s\t%s\n", "--no-ghost", "No ghost overlay from history.")
+	fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+	w.Flush()
 }
 
 func printSetHelp(out io.Writer) {
-	fmt.Fprintln(out, "Save paths to custom corpus files and whether to show the typing hint line (at least one option is required).")
+	fmt.Fprintln(out, "Merge into saved config; omitted flags unchanged. One flag minimum.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH] [--show-hint on|off]")
+	fmt.Fprintln(out, "  typer set [options]")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "      --words-file PATH     Newline-separated word list.")
-	fmt.Fprintln(out, "      --passages-file PATH  Blank-line-separated passage blocks.")
-	fmt.Fprintln(out, `      --show-hint on|off     Show or hide the hint line under the session title (default when unset: on).`)
+	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
+	fmt.Fprintln(out, "          [--show-hint on|off] [--input-position PLACE]")
+	fmt.Fprintln(out)
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Corpus:")
+	fmt.Fprintf(w, "  %s\t%s\n", "--words-file PATH", "Words mode list (newline-separated).")
+	fmt.Fprintf(w, "  %s\t%s\n", "--passages-file PATH", "Passages mode (blocks separated by blank lines).")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Session UI:")
+	fmt.Fprintf(w, "  %s\t%s\n", "--show-hint on|off", "Show or hide hint (default on).")
+	fmt.Fprintf(w, "  %s\t%s\n", "--input-position PLACE", "Input row (default top-left): top|bottom + left|center|right, or tl|tc|tr|bl|bc|br.")
+	w.Flush()
 }
 
 func printHistoryHelp(out io.Writer) {
-	fmt.Fprintln(out, "List recent typing sessions from local history.")
+	fmt.Fprintln(out, "List recent sessions from local history.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out)
-	fmt.Fprintf(out, "Options:\n")
-	fmt.Fprintf(out, "      --last int   Maximum sessions to show, 1..%d (default 20).\n", model.MaxRetainedHistorySessions)
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintf(w, "  %s\t%s\n", "--last int", fmt.Sprintf("How many to list, 1..%d (default 20).", model.MaxRetainedHistorySessions))
+	w.Flush()
 }
 
 func printStatsHelp(out io.Writer) {
-	fmt.Fprintln(out, "Print aggregate statistics over recent sessions.")
+	fmt.Fprintln(out, "Aggregate stats over recent sessions.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer stats [--last N]")
 	fmt.Fprintln(out)
-	fmt.Fprintf(out, "Options:\n")
-	fmt.Fprintf(out, "      --last int   Maximum sessions to analyze, 1..%d (default 20).\n", model.MaxRetainedHistorySessions)
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintf(w, "  %s\t%s\n", "--last int", fmt.Sprintf("How many sessions, 1..%d (default 20).", model.MaxRetainedHistorySessions))
+	w.Flush()
 }
 
 func printReplayHelp(out io.Writer) {
-	fmt.Fprintln(out, "Re-run a session from local history (`typer history` lists ids). Your run is scored against the saved one.")
-	fmt.Fprintln(out, "With a typing trace, a dim shadow replays the old keystrokes above your input; without it you get a short note.")
+	fmt.Fprintln(out, "Replay a saved session and compare to it. With a typing trace, a shadow replays the old keystrokes.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer replay -l")
-	fmt.Fprintln(out, "  typer replay --nth N   # 1 = newest, same order as typer history")
+	fmt.Fprintln(out, "  typer replay --nth N   # 1 = newest (same order as typer history)")
 	fmt.Fprintln(out, "  typer replay --id ID")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "  -l, --last      Most recent session.")
-	fmt.Fprintln(out, "      --nth int   N-th newest session (1 = newest).")
-	fmt.Fprintln(out, "      --id string Session id from history (id=... line).")
-	fmt.Fprintln(out, "      --no-input  Hide the input line; show the typing hint directly under the title.")
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintf(w, "  %s\t%s\n", "-l, --last", "Newest session.")
+	fmt.Fprintf(w, "  %s\t%s\n", "--nth int", "Nth newest (1 = newest).")
+	fmt.Fprintf(w, "  %s\t%s\n", "--id string", "Session id from typer history.")
+	fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+	w.Flush()
 }

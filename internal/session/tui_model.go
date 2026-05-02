@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"typer/internal/model"
 )
@@ -52,6 +53,8 @@ type typingSessionModel struct {
 	noInput bool
 	// hideHint hides the typing hint line under the session heading (from settings or SessionOptions).
 	hideHint bool
+	// inputPlacement positions and aligns the "> …" input row (from settings).
+	inputPlacement model.InputPlacement
 	// replay, when set, holds the prior session for shadow trace and (if showReplayUI) replay chrome.
 	replay *model.SessionResult
 	// showReplayUI is true only for `typer replay`; ghost-from-start uses the normal header without replay lines.
@@ -68,7 +71,7 @@ type typingSessionModel struct {
 	replayClockStart  time.Time
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement) *typingSessionModel {
 	words := strings.Fields(prompt.Content)
 
 	shadowStrict := false
@@ -91,6 +94,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		fingerHint:        fingerHint,
 		noInput:           noInput,
 		hideHint:          hideHint,
+		inputPlacement:    inputPlacement,
 		shadowTrace:       shadowTrace,
 		shadowStrict:      shadowStrict,
 		shadowWords:       make([]string, 0, n),
@@ -162,7 +166,14 @@ func (m *typingSessionModel) View() string {
 		b.WriteString(m.styles.meta.Width(tw).Render(formatReplayCompactLine(m.replay)))
 		b.WriteString("\n")
 	}
-	b.WriteString("\n")
+	// Hide the input line once the passage is finished (same effect as --no-input for the final paint).
+	showInput := !m.noInput && !m.isDone()
+	topInput := showInput && m.inputPlacement.V == model.InputVerticalTop
+	bottomInput := showInput && m.inputPlacement.V == model.InputVerticalBottom
+	if topInput {
+		b.WriteString(m.layoutAlignedInputLine(tw))
+		b.WriteString("\n")
+	}
 	b.WriteString(m.renderPassageFrame())
 	if m.fingerHint {
 		sf := m.suggestedFinger()
@@ -171,10 +182,9 @@ func (m *typingSessionModel) View() string {
 			b.WriteString(m.renderFingerHandsFrame(sf))
 		}
 	}
-	if !m.noInput {
+	if bottomInput {
 		b.WriteString("\n")
-		b.WriteString(m.styles.promptPrefix.Render("> "))
-		b.WriteString(m.renderInputWord())
+		b.WriteString(m.layoutAlignedInputLine(tw))
 	}
 	if m.status != "" {
 		b.WriteString("\n")
@@ -188,8 +198,20 @@ func (m *typingSessionModel) View() string {
 	return b.String()
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint, noInput, hideHint)
+func (m *typingSessionModel) layoutAlignedInputLine(tw int) string {
+	content := m.styles.promptPrefix.Render("> ") + m.renderInputWord()
+	align := lipgloss.Left
+	switch m.inputPlacement.H {
+	case model.InputHorizontalCenter:
+		align = lipgloss.Center
+	case model.InputHorizontalRight:
+		align = lipgloss.Right
+	}
+	return lipgloss.NewStyle().Width(tw).Align(align).Render(content)
+}
+
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint, noInput, hideHint, inputPlacement)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

@@ -28,6 +28,8 @@ type SessionOptions struct {
 	NoInput bool
 	// HideHint hides the typing hint line under the session title (default false = show hint).
 	HideHint bool
+	// InputPlacement positions and aligns the typed input line (from settings; omitted setting defaults to top-left).
+	InputPlacement InputPlacement
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
