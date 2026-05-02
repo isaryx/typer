@@ -79,7 +79,7 @@ func TestHistoryStoreAppendAndListReverseOrder(t *testing.T) {
 func TestHistoryStoreAppendEnforcesMaxSessions(t *testing.T) {
 	// Seed the file directly to avoid O(n^2) full-file rewrites in a loop.
 	store := newHistoryStoreAt(t)
-	seed := make([]model.SessionResult, maxHistorySessions)
+	seed := make([]model.SessionResult, model.MaxRetainedHistorySessions)
 	for i := range seed {
 		seed[i] = model.SessionResult{ID: "seed"}
 	}
@@ -98,8 +98,8 @@ func TestHistoryStoreAppendEnforcesMaxSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errListFmt, err)
 	}
-	if len(all) != maxHistorySessions {
-		t.Fatalf("expected retained count %d, got %d", maxHistorySessions, len(all))
+	if len(all) != model.MaxRetainedHistorySessions {
+		t.Fatalf("expected retained count %d, got %d", model.MaxRetainedHistorySessions, len(all))
 	}
 	// The three newest must be the appended ones (List returns newest first).
 	for i := 0; i < 3; i++ {

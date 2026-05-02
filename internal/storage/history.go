@@ -15,11 +15,6 @@ var ErrNoGhostCandidate = errors.New("no session with typing trace for this prom
 
 const historyVersion = 1
 
-// maxHistorySessions caps the retained-session count so history.json cannot
-// grow without bound. Append rewrites the full file, so an unbounded log
-// would eventually become a local-DoS pattern.
-const maxHistorySessions = 5000
-
 type HistoryStore struct {
 	path string
 }
@@ -42,8 +37,8 @@ func (s *HistoryStore) Append(result model.SessionResult) error {
 		return err
 	}
 	h.Sessions = append(h.Sessions, result)
-	if len(h.Sessions) > maxHistorySessions {
-		h.Sessions = slices.Clone(h.Sessions[len(h.Sessions)-maxHistorySessions:])
+	if len(h.Sessions) > model.MaxRetainedHistorySessions {
+		h.Sessions = slices.Clone(h.Sessions[len(h.Sessions)-model.MaxRetainedHistorySessions:])
 	}
 	h.Version = historyVersion
 	return writeJSONFileAtomic(s.path, h)

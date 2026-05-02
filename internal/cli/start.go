@@ -61,6 +61,18 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		return fmt.Errorf("--source is only valid with --mode quotes")
 	}
 
+	opts := model.SessionOptions{
+		Mode:       canonMode,
+		Words:      words,
+		Source:     source,
+		Strict:     strict,
+		Indefinite: indefinite,
+		FingerHint: fingerHint,
+	}
+	if err := model.ValidateSessionOptions(opts); err != nil {
+		return err
+	}
+
 	cache, err := storage.NewQuoteCacheStore()
 	if err != nil {
 		return err
@@ -97,15 +109,6 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 			b := best
 			return &b, nil
 		}
-	}
-
-	opts := model.SessionOptions{
-		Mode:       canonMode,
-		Words:      words,
-		Source:     source,
-		Strict:     strict,
-		Indefinite: indefinite,
-		FingerHint: fingerHint,
 	}
 
 	var results []model.SessionResult

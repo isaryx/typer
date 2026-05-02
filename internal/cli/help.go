@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"typer/internal/model"
 	"typer/internal/version"
 )
 
@@ -54,7 +55,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
 	fmt.Fprintln(out, "  -m, --mode string    Text mode: passages|p, words|w, or quotes|q (default quotes).")
-	fmt.Fprintln(out, "  -w, --words int      Words per prompt in words mode (default 15).")
+	fmt.Fprintf(out, "  -w, --words int      Words per prompt in words mode, 1..%d (default 15).\n", model.MaxWordsPerPrompt)
 	fmt.Fprintln(out, "      --source string  Quotes mode only: auto|remote|cache|seed (default seed).")
 	fmt.Fprintln(out, "  -s, --strict         Strict matching: wrong input does not advance (bare flag; omit for non-strict).")
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
@@ -79,8 +80,8 @@ func printHistoryHelp(out io.Writer) {
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "      --last int   Maximum sessions to show (default 20).")
+	fmt.Fprintf(out, "Options:\n")
+	fmt.Fprintf(out, "      --last int   Maximum sessions to show, 1..%d (default 20).\n", model.MaxRetainedHistorySessions)
 }
 
 func printStatsHelp(out io.Writer) {
@@ -89,8 +90,8 @@ func printStatsHelp(out io.Writer) {
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer stats [--last N]")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Options:")
-	fmt.Fprintln(out, "      --last int   Maximum sessions to analyze (default 20).")
+	fmt.Fprintf(out, "Options:\n")
+	fmt.Fprintf(out, "      --last int   Maximum sessions to analyze, 1..%d (default 20).\n", model.MaxRetainedHistorySessions)
 }
 
 func printReplayHelp(out io.Writer) {

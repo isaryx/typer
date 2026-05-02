@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"typer/internal/analytics"
+	"typer/internal/model"
 	"typer/internal/storage"
 )
 
@@ -25,6 +26,9 @@ func runHistory(args []string, stdout io.Writer) error {
 		return err
 	}
 	if err := rejectExtraArgs("history", fs.Args()); err != nil {
+		return err
+	}
+	if err := model.ValidateHistoryLast(*last); err != nil {
 		return err
 	}
 
@@ -72,6 +76,9 @@ func runStats(args []string, stdout io.Writer) error {
 		return err
 	}
 	if err := rejectExtraArgs("stats", fs.Args()); err != nil {
+		return err
+	}
+	if err := model.ValidateHistoryLast(*last); err != nil {
 		return err
 	}
 

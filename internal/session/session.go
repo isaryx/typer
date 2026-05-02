@@ -28,6 +28,10 @@ func NewRunner(provider text.Provider) *Runner {
 // replayBaseline, when non-nil, comes from `typer replay` and enables replay header UI plus shadow trace.
 // GhostBaseline runs only when replayBaseline is nil; it supplies shadow trace without replay chrome.
 func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Reader, output io.Writer, replayBaseline *model.SessionResult) (model.SessionResult, error) {
+	if err := model.ValidateSessionOptions(opts); err != nil {
+		return model.SessionResult{}, err
+	}
+
 	prompt, err := r.Provider.Next(ctx, text.Constraints{
 		Words:  opts.Words,
 		Source: opts.Source,

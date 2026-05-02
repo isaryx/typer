@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -329,6 +330,28 @@ func TestRunStartSourceRejectedForNonQuoteMode(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--source is only valid") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
+func TestRunStartRejectsWordsAboveMax(t *testing.T) {
+	var stdout bytes.Buffer
+	err := runStart(context.Background(), []string{"-m", "words", "-w", strconv.Itoa(model.MaxWordsPerPrompt + 1)}, strings.NewReader(""), &stdout)
+	if err == nil {
+		t.Fatal("expected error for words above max")
+	}
+	if !strings.Contains(err.Error(), "cannot exceed") {
+		t.Fatalf(unexpectedErrFmt, err)
+	}
+}
+
+func TestRunHistoryRejectsLastOutOfRange(t *testing.T) {
+	var stdout bytes.Buffer
+	if err := runHistory([]string{testFlagLast, "0"}, &stdout); err == nil {
+		t.Fatal("expected error for --last 0")
+	}
+	stdout.Reset()
+	if err := runHistory([]string{testFlagLast, strconv.Itoa(model.MaxRetainedHistorySessions + 1)}, &stdout); err == nil {
+		t.Fatal("expected error for --last above max")
 	}
 }
 
