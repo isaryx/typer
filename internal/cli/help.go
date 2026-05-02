@@ -52,7 +52,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input] [--no-audible]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 
@@ -66,6 +66,7 @@ func printStartHelp(out io.Writer) {
 		fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "QWERTY finger diagram for next key (bare flag).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-ghost", "No ghost overlay from history.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
 	})
 }
 
@@ -131,5 +132,6 @@ func printReplayHelp(out io.Writer) {
 		fmt.Fprintf(w, "  %s\t%s\n", "--nth int", "Nth newest (1 = newest).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--id string", "Session id from typer history.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
 	})
 }

@@ -60,6 +60,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		noInput:        opts.NoInput,
 		hideHint:       opts.HideHint,
 		inputPlacement: opts.InputPlacement,
+		noAudible:      opts.NoAudible,
 	})
 	if err != nil {
 		return model.SessionResult{}, err

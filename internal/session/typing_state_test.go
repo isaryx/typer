@@ -10,7 +10,8 @@ import (
 func TestTypingStateApplyRunesStrict(t *testing.T) {
 	s := newTypingState([]string{"hello", "world"}, true, func() time.Time { return time.Unix(100, 0) })
 
-	if !s.applyRunes([]rune("x")) {
+	clock, _ := s.applyRunes([]rune("x"))
+	if !clock {
 		t.Fatal("first keystroke batch starts session clock even when strict rejects every rune")
 	}
 	if s.current != "" {
@@ -20,18 +21,28 @@ func TestTypingStateApplyRunesStrict(t *testing.T) {
 		t.Fatalf("wrong key still counts toward keystrokes, got %d", s.totalKeystrokes)
 	}
 
-	if s.applyRunes([]rune("he")) {
+	if clock, _ := s.applyRunes([]rune("he")); clock {
 		t.Fatal("later batch should not restart clock")
 	}
 	if s.current != "he" {
 		t.Fatalf("want he, got %q", s.current)
 	}
 
-	if s.applyRunes([]rune("x")) {
+	if clock, _ := s.applyRunes([]rune("x")); clock {
 		t.Fatal("should not restart clock")
 	}
 	if s.current != "he" {
 		t.Fatalf("wrong rune rejected: got %q", s.current)
+	}
+}
+
+func TestTypingStateApplyRunesMistakeAfterPrefixBroken(t *testing.T) {
+	// "hal" is not a prefix of "hello"; the next "l" matches target[3] but the word is already wrong.
+	s := newTypingState([]string{"hello"}, false, func() time.Time { return time.Unix(100, 0) })
+	s.applyRunes([]rune("hal"))
+	_, mistake := s.applyRunes([]rune("l"))
+	if !mistake {
+		t.Fatal("want mistake feedback once prefix no longer matches target")
 	}
 }
 

@@ -42,13 +42,27 @@ func newTypingState(words []string, strict bool, now func() time.Time) *typingSt
 	}
 }
 
-// applyRunes appends input runes for the active word. Returns true if this call started the session clock
-// (first user input in the run).
-func (s *typingState) applyRunes(runes []rune) bool {
-	if len(runes) == 0 || s.wordIndex >= len(s.words) {
+// runesArePrefix reports whether cur equals the first len(cur) runes of tgt.
+func runesArePrefix(cur, tgt []rune) bool {
+	if len(cur) > len(tgt) {
 		return false
 	}
-	var sessionClockStarted bool
+	for i := 0; i < len(cur); i++ {
+		if cur[i] != tgt[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// applyRunes appends input runes for the active word. Returns whether this call started the session clock
+// (first user input in the run), and whether any keystroke should trigger mistake feedback (bell).
+// In non-strict mode, once the buffer is no longer a prefix of the target word, every further keystroke
+// counts as mistake feedback until the user fixes with backspace (the word cannot match without that).
+func (s *typingState) applyRunes(runes []rune) (sessionClockStarted bool, mistake bool) {
+	if len(runes) == 0 || s.wordIndex >= len(s.words) {
+		return false, false
+	}
 	if s.startedAt.IsZero() {
 		s.startedAt = s.now().UTC()
 		sessionClockStarted = true
@@ -64,13 +78,17 @@ func (s *typingState) applyRunes(runes []rune) bool {
 		if matched {
 			s.correctKeystrokes++
 		}
+		prefixBroken := !s.strict && !runesArePrefix(current, target)
+		if !matched || prefixBroken {
+			mistake = true
+		}
 		if s.strict && !matched {
 			continue
 		}
 		current = append(current, r)
 	}
 	s.current = string(current)
-	return sessionClockStarted
+	return sessionClockStarted, mistake
 }
 
 type commitWordResult struct {

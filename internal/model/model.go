@@ -31,6 +31,8 @@ type SessionOptions struct {
 	// InputPlacement positions and aligns the typed input line. The Go zero value is bottom-left;
 	// CLI paths apply settings (DefaultInputPlacement / parsed input_position) before Run.
 	InputPlacement InputPlacement
+	// NoAudible disables terminal bell on mistakes (default false = bell on).
+	NoAudible bool
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.

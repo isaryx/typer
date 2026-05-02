@@ -32,6 +32,8 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	fs.BoolVar(&noGhost, "no-ghost", false, "Skip ghost overlay from best prior run.")
 	var noInput bool
 	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
+	var noAudible bool
+	fs.BoolVar(&noAudible, "no-audible", false, "Disable terminal bell on mistakes.")
 
 	rest, strict, indefinite, fingerHint, err := extractPresenceFlags(args)
 	if err != nil {
@@ -71,6 +73,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		Indefinite: indefinite,
 		FingerHint: fingerHint,
 		NoInput:    noInput,
+		NoAudible:  noAudible,
 	}
 	if err := model.ValidateSessionOptions(opts); err != nil {
 		return err

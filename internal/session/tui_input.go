@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +17,9 @@ func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 		return nil
 	}
 	if res.strictBlocked {
+		if m.bellOut != nil {
+			fmt.Fprint(m.bellOut, "\a")
+		}
 		m.status = ""
 		return nil
 	}
@@ -32,7 +36,11 @@ func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 }
 
 func (m *typingSessionModel) appendRunes(runes []rune) tea.Cmd {
-	if m.typingState.applyRunes(runes) {
+	clock, mistake := m.typingState.applyRunes(runes)
+	if mistake && m.bellOut != nil {
+		fmt.Fprint(m.bellOut, "\a")
+	}
+	if clock {
 		return m.afterSessionClockStart()
 	}
 	return nil

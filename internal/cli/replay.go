@@ -33,6 +33,8 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
 	var noInput bool
 	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
+	var noAudible bool
+	fs.BoolVar(&noAudible, "no-audible", false, "Disable terminal bell on mistakes.")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printReplayHelp(stdout)
@@ -89,6 +91,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
 	opts := model.SessionOptionsForReplay(baseline)
 	opts.NoInput = noInput
+	opts.NoAudible = noAudible
 	opts.HideHint = !settings.HintVisible()
 	opts.InputPlacement = settings.InputPlacement()
 	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)

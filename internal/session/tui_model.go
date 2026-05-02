@@ -69,9 +69,11 @@ type typingSessionModel struct {
 	shadowCurrent     string
 	shadowWordIndex   int
 	replayClockStart  time.Time
+	// bellOut receives the terminal bell (ASCII 7) on mistakes; nil disables audible feedback.
+	bellOut io.Writer
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer) *typingSessionModel {
 	words := strings.Fields(prompt.Content)
 
 	shadowStrict := false
@@ -99,6 +101,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		shadowStrict:      shadowStrict,
 		shadowWords:       make([]string, 0, n),
 		shadowWordMatches: make([]bool, 0, n),
+		bellOut:           bellOut,
 	}
 }
 
@@ -221,10 +224,15 @@ type typingSessionRunOpts struct {
 	noInput        bool
 	hideHint       bool
 	inputPlacement model.InputPlacement
+	noAudible      bool
 }
 
 func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, o typingSessionRunOpts) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement)
+	var bellOut io.Writer
+	if !o.noAudible {
+		bellOut = output
+	}
+	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement, bellOut)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}
