@@ -4,16 +4,14 @@ Cross-platform typing trainer CLI written in Go.
 
 ## Features
 
-- English-only UI and bundled practice text
-- Sessions: **passages**, **words**, or **quotes**
-- Gross/net WPM, accuracy, errors, elapsed time; history saved locally as JSON
-- **Replay** saved sessions and compare metrics (`typer replay`)
-- Defaults and corpus paths via **`typer set`** (hint visibility, input layout, custom word/passage files)
-- Offline-first with bundled text and quote seeds
+- Practice in the terminal: **passages**, **words**, or **quotes**
+- Speed and accuracy stats; sessions saved on your machine
+- History, stats, and replay when you want to compare runs
+- Offline-friendly with bundled text
 
 ## Requirements
 
-[Go](https://go.dev/dl/) — the `go` line in [`go.mod`](go.mod) is the language version this repo targets; use that toolchain or newer.
+[Go](https://go.dev/dl/) — only needed to build from this repo; match the `go` line in [`go.mod`](go.mod) or newer.
 
 ## Install
 
@@ -24,25 +22,16 @@ brew tap isaryx/collection
 brew install typer
 ```
 
-**Or** grab a release from GitHub Releases: extract the archive and put `typer` (macOS/Linux) or `typer.exe` (Windows) on your `PATH`.
+**Or** use a release from GitHub Releases: put `typer` (macOS/Linux) or `typer.exe` (Windows) on your `PATH`.
 
 ## Usage
 
-After install, run `typer` from your terminal. Examples:
-
 ```bash
-typer start --mode passages
-typer start --mode words --words 50
-typer start --mode quotes
-typer replay -l                    # replay newest session; see typer replay -h
-typer history --last 20
-typer stats --last 20
-typer set --show-hint on           # persist defaults; see typer set -h
-typer version
-typer credits
+typer start
+typer history
 ```
 
-From a clone, use `go run ./cmd/typer …` instead of `typer`. Run `typer --help` for all commands (`replay`, `set`, `key-press`, `typer --reset-progress`, etc.) and `typer start --help` for session flags (strict mode, quote source, `--no-ghost`, custom corpus paths, etc.).
+Run `typer --help` and `typer start --help` for modes, flags, and other commands (`replay`, `set`, etc.). From a clone, use `go run ./cmd/typer` instead of `typer`.
 
 ## Build
 
@@ -64,14 +53,12 @@ go build -ldflags "-X typer/internal/version.Version=0.01" -o typer ./cmd/typer
 
 ## Privacy & local data
 
-Session history and settings stay on your machine (for example under `~/.config/typer` / `~/.cache/typer` on Linux). History stores what you typed so you can review sessions later. Each session also stores a **SHA-256 hash** of the canonical prompt text (not reversible to recover the passage from the hash alone) so runs with the same text can be grouped—`typer start` uses a ghost overlay from the **best** saved run of the same text when one exists (with a typing trace). Pass `--no-ghost` to turn that off.
+History and settings stay on your device (typical paths include `~/.config/typer` on Linux). Saved sessions include what you typed so you can review them later. By default, practice can show a light ghost from a previous run on the same text; pass `--no-ghost` on `typer start` if you prefer not to.
 
 ## Credits
 
-**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT); [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) for terminal sizing when laying out the session and stats panels (BSD-3-Clause).
+**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT); [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (BSD-3-Clause).
 
-**Session IDs (ULID):** [oklog/ulid](https://github.com/oklog/ulid) — Go package [`github.com/oklog/ulid/v2`](https://pkg.go.dev/github.com/oklog/ulid/v2), Apache License 2.0. ([ULID specification](https://github.com/ulid/spec).)
+**Session IDs:** [oklog/ulid](https://github.com/oklog/ulid) ([spec](https://github.com/ulid/spec)), Apache-2.0.
 
-**Bundled content:** Words list from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages built from public-domain proverbs (details in `assets/PASSAGES_CREDITS.md`). Quotes mode can use [type.fit](https://type.fit/api/quotes) or bundled seed data.
-
-Scoring formulas and edge cases live in `internal/scoring/scoring.go`.
+**Bundled content:** Words from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages from public-domain proverbs ([details](assets/PASSAGES_CREDITS.md)). Quotes can use [type.fit](https://type.fit/api/quotes) or bundled data.
