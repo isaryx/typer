@@ -1,0 +1,93 @@
+package session
+
+import (
+	"testing"
+	"time"
+
+	"typer/internal/model"
+)
+
+func TestTypingStateApplyRunesStrict(t *testing.T) {
+	s := newTypingState([]string{"hello", "world"}, true, func() time.Time { return time.Unix(100, 0) })
+
+	if !s.applyRunes([]rune("x")) {
+		t.Fatal("first keystroke batch starts session clock even when strict rejects every rune")
+	}
+	if s.current != "" {
+		t.Fatalf("want empty current, got %q", s.current)
+	}
+	if s.totalKeystrokes != 1 {
+		t.Fatalf("wrong key still counts toward keystrokes, got %d", s.totalKeystrokes)
+	}
+
+	if s.applyRunes([]rune("he")) {
+		t.Fatal("later batch should not restart clock")
+	}
+	if s.current != "he" {
+		t.Fatalf("want he, got %q", s.current)
+	}
+
+	if s.applyRunes([]rune("x")) {
+		t.Fatal("should not restart clock")
+	}
+	if s.current != "he" {
+		t.Fatalf("wrong rune rejected: got %q", s.current)
+	}
+}
+
+func TestTypingStateApplyCommitWordTable(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1000, 0)
+	clk := func() time.Time { return now }
+
+	t.Run("empty_buffer_shows_empty_flag", func(t *testing.T) {
+		s := newTypingState([]string{"go"}, false, clk)
+		r := s.applyCommitWord()
+		if !r.emptyCurrent || r.advanced || r.strictBlocked || r.sessionClockStarted {
+			t.Fatalf("unexpected %+v", r)
+		}
+	})
+
+	t.Run("strict_mismatch_blocked", func(t *testing.T) {
+		s := newTypingState([]string{"hi"}, true, clk)
+		s.current = "ho"
+		r := s.applyCommitWord()
+		if !r.strictBlocked || r.advanced || r.emptyCurrent {
+			t.Fatalf("unexpected %+v", r)
+		}
+		if s.wordIndex != 0 {
+			t.Fatal("should not advance")
+		}
+	})
+
+	t.Run("non_strict_mismatch_advances", func(t *testing.T) {
+		s := newTypingState([]string{"hi"}, false, clk)
+		s.applyRunes([]rune("ho"))
+		r := s.applyCommitWord()
+		if !r.advanced || r.strictBlocked || r.emptyCurrent {
+			t.Fatalf("unexpected %+v", r)
+		}
+		if s.wordIndex != 1 || s.totalErrors != 1 {
+			t.Fatalf("wordIndex=%d errors=%d", s.wordIndex, s.totalErrors)
+		}
+	})
+
+	t.Run("commit_without_prior_keystroke_starts_clock", func(t *testing.T) {
+		s := newTypingState([]string{"a"}, false, clk)
+		s.current = "a"
+		r := s.applyCommitWord()
+		if !r.advanced || !r.sessionClockStarted {
+			t.Fatalf("unexpected %+v", r)
+		}
+		var sawCommit bool
+		for _, ev := range s.typingTrace {
+			if ev.Kind == model.ReplayEventCommit {
+				sawCommit = true
+				break
+			}
+		}
+		if !sawCommit {
+			t.Fatal("expected commit event")
+		}
+	})
+}

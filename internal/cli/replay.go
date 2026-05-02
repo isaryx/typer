@@ -1,0 +1,155 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+
+	"typer/internal/model"
+	"typer/internal/session"
+	"typer/internal/text"
+	"typer/internal/ui"
+)
+
+// Replay comparison line colors (shared TUI palette).
+var (
+	replayDeltaGood = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorTitle))
+	replayDeltaBad  = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorCompletedBad))
+)
+
+func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := flag.NewFlagSet("replay", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	id := fs.String("id", "", "Session id (from `typer history`, id=...).")
+	nth := fs.Int("nth", 0, "Replay the n-th newest session (1 = most recent).")
+	var last bool
+	fs.BoolVar(&last, "last", false, "Replay the most recent session.")
+	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printReplayHelp(stdout)
+			return nil
+		}
+		return err
+	}
+	if err := rejectExtraArgs("replay", fs.Args()); err != nil {
+		return err
+	}
+
+	var useID string
+	var nSelect int
+	switch {
+	case last:
+		nSelect = 1
+	case *nth > 0:
+		nSelect = *nth
+	case strings.TrimSpace(*id) != "":
+		useID = strings.TrimSpace(*id)
+	default:
+		return errors.New("replay requires -l/--last, --nth N, or --id ID (see: typer replay -h)")
+	}
+
+	store, err := newHistoryStore()
+	if err != nil {
+		return err
+	}
+	var baseline model.SessionResult
+	if useID != "" {
+		baseline, err = store.GetByID(useID)
+	} else {
+		baseline, err = store.NthNewest(nSelect)
+	}
+	if err != nil {
+		return err
+	}
+	if len(strings.Fields(baseline.Prompt.Content)) == 0 {
+		return errors.New("cannot replay: stored prompt has no words")
+	}
+
+	if msg := typingTraceUserNote(baseline); msg != "" {
+		fmt.Fprintln(stdout, msg)
+	}
+
+	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
+	opts := model.SessionOptionsForReplay(baseline)
+	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
+	if err != nil {
+		return err
+	}
+	if result.Aborted {
+		fmt.Fprintln(stdout, "\nReplay aborted.")
+		return nil
+	}
+	if err := store.Append(result); err != nil {
+		return err
+	}
+	printStartResults(stdout, []model.SessionResult{result})
+	printReplayComparison(stdout, baseline, result)
+	return nil
+}
+
+func printReplayComparison(out io.Writer, previous, current model.SessionResult) {
+	if current.Aborted {
+		return
+	}
+	dNet := current.Metrics.NetWPM - previous.Metrics.NetWPM
+	dAcc := current.Metrics.Accuracy - previous.Metrics.Accuracy
+	dErr := current.Metrics.Errors - previous.Metrics.Errors
+	deltaMS := current.ElapsedMS - previous.ElapsedMS
+	fmt.Fprintln(out, "Comparison:")
+	fmt.Fprintf(out, "  Net WPM:  %s (%.2f →  %.2f)\n",
+		styleHigherBetterDelta(dNet).Render(fmt.Sprintf("%+.2f", dNet)),
+		previous.Metrics.NetWPM, current.Metrics.NetWPM)
+	fmt.Fprintf(out, "  Accuracy: %s (%.2f%% →  %.2f%%)\n",
+		styleHigherBetterDelta(dAcc).Render(fmt.Sprintf("%+.2f%%", dAcc)),
+		previous.Metrics.Accuracy, current.Metrics.Accuracy)
+	fmt.Fprintf(out, "  Errors:   %s (%d →  %d)\n",
+		styleFewerErrorsBetterDelta(dErr).Render(fmt.Sprintf("%+d", dErr)),
+		previous.Metrics.Errors, current.Metrics.Errors)
+	switch {
+	case deltaMS < 0:
+		timePhrase := replayDeltaGood.Render(fmt.Sprintf("%s faster", ui.FormatElapsedMS(-deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, ui.FormatElapsedMS(previous.ElapsedMS), ui.FormatElapsedMS(current.ElapsedMS))
+	case deltaMS > 0:
+		timePhrase := replayDeltaBad.Render(fmt.Sprintf("%s slower", ui.FormatElapsedMS(deltaMS)))
+		fmt.Fprintf(out, "  Time:     %s  (%s →  %s)\n", timePhrase, ui.FormatElapsedMS(previous.ElapsedMS), ui.FormatElapsedMS(current.ElapsedMS))
+	default:
+		fmt.Fprintf(out, "  Time:     same  (%s)\n", ui.FormatElapsedMS(current.ElapsedMS))
+	}
+}
+
+func styleHigherBetterDelta(delta float64) lipgloss.Style {
+	switch {
+	case delta > 0:
+		return replayDeltaGood
+	case delta < 0:
+		return replayDeltaBad
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+func styleFewerErrorsBetterDelta(delta int) lipgloss.Style {
+	switch {
+	case delta < 0:
+		return replayDeltaGood
+	case delta > 0:
+		return replayDeltaBad
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+// typingTraceUserNote is a one-line notice when the baseline has no stored keystroke trace
+// (older sessions or future options to omit traces), so the TUI will not show a shadow.
+func typingTraceUserNote(baseline model.SessionResult) string {
+	if len(baseline.TypingTrace) == 0 {
+		return "Note: This session has no typing trace; shadow replay is unavailable."
+	}
+	return ""
+}
