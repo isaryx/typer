@@ -14,6 +14,18 @@ Clone and run locally:
 go run ./cmd/typer start --mode passages
 ```
 
+## Project layout
+
+Rough map of where things live:
+
+- `cmd/typer` — `main`, wires `internal/cli`.
+- `internal/cli` — Subcommands and flags (`root.go` dispatches; other files per command).
+- `internal/session` — Bubble Tea session UI; `typing_state.go` holds core word-lane typing logic (no TUI imports).
+- `internal/model` — Shared types (sessions, prompts, replay trace).
+- `internal/text` — Prompt providers (words, passages, quotes).
+- `internal/storage` — Local JSON history, settings, quote cache.
+- `internal/scoring` — WPM and related metrics.
+
 ## Test and Quality Checks
 
 Before opening a PR, run:
