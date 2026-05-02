@@ -7,6 +7,8 @@ Cross-platform typing trainer CLI written in Go.
 - English-only UI and bundled practice text
 - Sessions: **passages**, **words**, or **quotes**
 - Gross/net WPM, accuracy, errors, elapsed time; history saved locally as JSON
+- **Replay** saved sessions and compare metrics (`typer replay`)
+- Defaults and corpus paths via **`typer set`** (hint visibility, input layout, custom word/passage files)
 - Offline-first with bundled text and quote seeds
 
 ## Requirements
@@ -32,13 +34,15 @@ After install, run `typer` from your terminal. Examples:
 typer start --mode passages
 typer start --mode words --words 50
 typer start --mode quotes
+typer replay -l                    # replay newest session; see typer replay -h
 typer history --last 20
 typer stats --last 20
+typer set --show-hint on           # persist defaults; see typer set -h
 typer version
 typer credits
 ```
 
-From a clone, use `go run ./cmd/typer …` instead of `typer`. Use `typer --help` and `typer start --help` for flags (strict mode, custom word/passage files, quote source, reset progress, etc.).
+From a clone, use `go run ./cmd/typer …` instead of `typer`. Run `typer --help` for all commands (`replay`, `set`, `key-press`, `typer --reset-progress`, etc.) and `typer start --help` for session flags (strict mode, quote source, `--no-ghost`, custom corpus paths, etc.).
 
 ## Build
 
