@@ -56,10 +56,10 @@ var newHistoryStore = storage.NewHistoryStore
 // are rejected.
 func extractPresenceFlags(args []string) (rest []string, strict, indefinite, fingerHint bool, err error) {
 	strictNames := map[string]struct{}{
-		"--strict": {}, "-strict": {}, "-s": {},
+		"--strict": {}, "-s": {},
 	}
 	indefNames := map[string]struct{}{
-		"--indefinite": {}, "-indefinite": {}, "-i": {},
+		"--indefinite": {}, "-i": {},
 	}
 	fingerNames := map[string]struct{}{
 		"--finger-hint": {}, "-f": {},
@@ -69,7 +69,7 @@ func extractPresenceFlags(args []string) (rest []string, strict, indefinite, fin
 		name, _, foundEq := strings.Cut(a, "=")
 		if foundEq {
 			if _, ok := strictNames[name]; ok {
-				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --strict, -strict, or -s for strict mode, or omit for non-strict", a)
+				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --strict or -s for strict mode, or omit for non-strict", a)
 			}
 			if _, ok := indefNames[name]; ok {
 				return nil, false, false, false, fmt.Errorf("invalid %s: use bare --indefinite or -i for indefinite mode, or omit", a)
