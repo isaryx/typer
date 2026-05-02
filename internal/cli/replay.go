@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"typer/internal/model"
 	"typer/internal/session"

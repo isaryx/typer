@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"typer/internal/model"
 )
@@ -119,9 +119,9 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.width = 20
 		}
 		return m, nil
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "ctrl+c", "esc":
 			m.aborted = true
 			m.endedAt = m.now().UTC()
 			return m, tea.Quit
@@ -129,12 +129,12 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isDone() {
 			return m, tea.Quit
 		}
-		switch msg.Type {
-		case tea.KeyBackspace:
+		switch msg.String() {
+		case "backspace":
 			m.applyBackspace()
 			m.status = ""
 			return m, nil
-		case tea.KeySpace, tea.KeyEnter:
+		case "space", "enter":
 			cmd := m.commitCurrentWord()
 			if m.isDone() {
 				m.endedAt = m.now().UTC()
@@ -142,8 +142,8 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		default:
-			if msg.Type == tea.KeyRunes {
-				cmd := m.appendRunes(msg.Runes)
+			if len(msg.Text) > 0 {
+				cmd := m.appendRunes([]rune(msg.Text))
 				m.status = ""
 				return m, cmd
 			}
@@ -152,9 +152,9 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *typingSessionModel) View() string {
+func (m *typingSessionModel) View() tea.View {
 	if len(m.words) == 0 {
-		return "No text available for this session.\n"
+		return tea.NewView("No text available for this session.\n")
 	}
 
 	tw := m.wrapWidth()
@@ -198,7 +198,7 @@ func (m *typingSessionModel) View() string {
 		b.WriteString(m.styles.meta.Width(tw).Render("Indefinite mode — Ctrl+C or Esc to stop"))
 	}
 	b.WriteString("\n")
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 func (m *typingSessionModel) layoutAlignedInputLine(tw int) string {

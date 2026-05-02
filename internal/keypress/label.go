@@ -4,17 +4,26 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // maxDisplayLabelRunes caps pasted / IME text so the UI and history stay usable.
 const maxDisplayLabelRunes = 72
 
 // DisplayLabel returns a readable string for a key event. It is based on
-// bubbletea's KeyMsg.String() with small adjustments for empty/space and
+// bubbletea's KeyPressMsg.String() with small adjustments for empty/space and
 // truncation for very long input (e.g. bracketed paste).
-func DisplayLabel(msg tea.KeyMsg) string {
-	s := msg.String()
+func DisplayLabel(msg tea.KeyPressMsg) string {
+	k := tea.Key(msg)
+	if k.Mod == 0 && k.Text == "" && k.Code == 0 {
+		return "?"
+	}
+	var s string
+	if k.Mod != 0 {
+		s = k.Keystroke()
+	} else {
+		s = k.String()
+	}
 	if s == "" {
 		return "?"
 	}

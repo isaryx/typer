@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"typer/internal/model"
 	"typer/internal/ui"
@@ -294,7 +294,7 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
-	got := m.View()
+	got := m.View().Content
 	if !strings.Contains(got, "typer · words · non-strict") {
 		t.Fatalf("expected session heading in view, got %q", got)
 	}
@@ -314,7 +314,7 @@ func TestViewHideHintOmitsHintLine(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
-	got := m.View()
+	got := m.View().Content
 	if strings.Contains(got, inputHint) {
 		t.Fatalf("expected hint hidden, got:\n%s", got)
 	}
@@ -337,7 +337,7 @@ func TestViewNoInputPlacesHintUnderHeadingHidesPrompt(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
-	got := m.View()
+	got := m.View().Content
 	if strings.Contains(got, "> ") {
 		t.Fatalf("expected no input prompt, got:\n%s", got)
 	}
@@ -449,7 +449,7 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		nil,
 	)
 	m.current = "hé"
-	gotModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	gotModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	updated := gotModel.(*typingSessionModel)
 	if updated.current != "h" {
 		t.Fatalf("current = %q, want %q", updated.current, "h")
@@ -475,7 +475,7 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 		nil,
 	)
 	m.current = "hello"
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	gotModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	updated := gotModel.(*typingSessionModel)
 	if !updated.isDone() {
 		t.Fatal("expected session to be done after committing only word")
@@ -507,7 +507,7 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 		nil,
 	)
 	m.current = "go"
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	gotModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	updated := gotModel.(*typingSessionModel)
 	if !updated.isDone() {
 		t.Fatal("expected enter to commit and finish")
@@ -518,8 +518,15 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 }
 
 func TestUpdateEscAndCtrlCAbort(t *testing.T) {
-	for _, key := range []tea.KeyType{tea.KeyEsc, tea.KeyCtrlC} {
-		t.Run(key.String(), func(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  tea.KeyPressMsg
+	}{
+		{name: "esc", msg: tea.KeyPressMsg{Code: tea.KeyEsc}},
+		{name: "ctrl+c", msg: tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			m := newTypingSessionModel(
 				model.Prompt{Content: helloWorldPrompt},
 				false,
@@ -533,7 +540,7 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 				model.InputPlacement{},
 				nil,
 			)
-			gotModel, cmd := m.Update(tea.KeyMsg{Type: key})
+			gotModel, cmd := m.Update(tc.msg)
 			updated := gotModel.(*typingSessionModel)
 			if !updated.aborted {
 				t.Fatal("expected aborted flag to be set")
@@ -639,7 +646,7 @@ func TestViewReplayTitleShowsSessionID(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
-	v := m.View()
+	v := m.View().Content
 	want := "Replay · " + sid + " | net 10.00 wpm"
 	if !strings.Contains(v, want) {
 		t.Fatalf("expected %q in view, got:\n%s", want, v)
@@ -664,7 +671,7 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
 		t.Fatalf("ghost-only session should not show replay chrome, got:\n%s", v)
 	}
@@ -688,7 +695,7 @@ func TestViewFingerHintShowsFramedHands(t *testing.T) {
 		nil,
 	)
 	m.width = 88
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "Left hand") || !strings.Contains(v, "Right hand") {
 		t.Fatalf("expected hands labels in view:\n%s", v)
 	}
@@ -727,7 +734,7 @@ func TestViewInputLineTopBeforePassageFrame(t *testing.T) {
 		nil,
 	)
 	m.width = 80
-	v := m.View()
+	v := m.View().Content
 	idxPrompt := strings.Index(v, "> ")
 	idxFrame := strings.Index(v, "╭")
 	if idxPrompt < 0 || idxFrame < 0 || idxPrompt >= idxFrame {
@@ -750,7 +757,7 @@ func TestViewInputLineBottomAfterPassageFrame(t *testing.T) {
 		nil,
 	)
 	m.width = 80
-	v := m.View()
+	v := m.View().Content
 	idxPrompt := strings.Index(v, "> ")
 	idxFrame := strings.Index(v, "╭")
 	if idxPrompt < 0 || idxFrame < 0 || idxPrompt <= idxFrame {
@@ -773,7 +780,7 @@ func TestViewInputLineCenterPlacementRenders(t *testing.T) {
 		nil,
 	)
 	m.width = 120
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "> ") {
 		t.Fatalf("expected input line in view:\n%s", v)
 	}
@@ -799,7 +806,7 @@ func TestViewHidesInputLineWhenSessionComplete(t *testing.T) {
 	if !m.isDone() {
 		t.Fatal("model should be in completed state")
 	}
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "> ") {
 		t.Fatalf("expected no input line when session complete, got:\n%s", v)
 	}

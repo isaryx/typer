@@ -4,44 +4,44 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestDisplayLabel(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
-		msg  tea.KeyMsg
+		msg  tea.KeyPressMsg
 		want string
 	}{
 		{
 			name: "alt_rune",
-			msg:  tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}, Alt: true},
+			msg:  tea.KeyPressMsg{Code: 'a', Text: "a", Mod: tea.ModAlt},
 			want: "alt+a",
 		},
 		{
 			name: "ctrl_k",
-			msg:  tea.KeyMsg{Type: tea.KeyCtrlK},
+			msg:  tea.KeyPressMsg{Code: 'k', Mod: tea.ModCtrl},
 			want: "ctrl+k",
 		},
 		{
 			name: "space",
-			msg:  tea.KeyMsg{Type: tea.KeySpace},
+			msg:  tea.KeyPressMsg{Code: tea.KeySpace},
 			want: "space",
 		},
 		{
 			name: "lowercase_a",
-			msg:  tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}},
+			msg:  tea.KeyPressMsg{Code: 'a', Text: "a"},
 			want: "a",
 		},
 		{
 			name: "esc",
-			msg:  tea.KeyMsg{Type: tea.KeyEsc},
+			msg:  tea.KeyPressMsg{Code: tea.KeyEsc},
 			want: "esc",
 		},
 		{
 			name: "ctrl_c",
-			msg:  tea.KeyMsg{Type: tea.KeyCtrlC},
+			msg:  tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl},
 			want: "ctrl+c",
 		},
 	}
@@ -59,7 +59,7 @@ func TestDisplayLabel(t *testing.T) {
 func TestDisplayLabel_emptyString(t *testing.T) {
 	t.Parallel()
 	// If String() is empty, we show "?".
-	if got := DisplayLabel(tea.KeyMsg{Type: tea.KeyRunes, Runes: nil}); got != "?" {
+	if got := DisplayLabel(tea.KeyPressMsg{}); got != "?" {
 		t.Fatalf("DisplayLabel(nil runes) = %q, want %q", got, "?")
 	}
 }
@@ -67,7 +67,7 @@ func TestDisplayLabel_emptyString(t *testing.T) {
 func TestDisplayLabel_truncatesLongInput(t *testing.T) {
 	t.Parallel()
 	long := strings.Repeat("a", maxDisplayLabelRunes+20)
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(long)}
+	msg := tea.KeyPressMsg{Text: long}
 	got := DisplayLabel(msg)
 	if !strings.HasSuffix(got, "…") {
 		t.Fatalf("expected suffix …, got %q", got)

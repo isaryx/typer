@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -62,11 +62,11 @@ func (m keyPressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.height = 5
 		}
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		label := DisplayLabel(msg)
 		m.lastLabel = label
 		m.history = AppendHistory(m.history, label, historyMax)
-		if msg.Type == tea.KeyCtrlC {
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
 		return m, nil
@@ -75,7 +75,7 @@ func (m keyPressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m keyPressModel) View() string {
+func (m keyPressModel) View() tea.View {
 	tw := m.width
 	th := m.height
 
@@ -113,7 +113,9 @@ func (m keyPressModel) View() string {
 
 	stack := lipgloss.JoinVertical(lipgloss.Center, mid, "", footer)
 
-	return lipgloss.Place(tw, th, lipgloss.Center, lipgloss.Center, stack)
+	v := tea.NewView(lipgloss.Place(tw, th, lipgloss.Center, lipgloss.Center, stack))
+	v.AltScreen = true
+	return v
 }
 
 // RunKeyPress runs the full-screen key display until Ctrl+C or ctx cancellation.
@@ -123,7 +125,6 @@ func RunKeyPress(ctx context.Context, input io.Reader, output io.Writer) error {
 		tea.WithContext(ctx),
 		tea.WithInput(input),
 		tea.WithOutput(output),
-		tea.WithAltScreen(),
 	)
 	_, err := p.Run()
 	return err
