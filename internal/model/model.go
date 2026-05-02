@@ -26,6 +26,8 @@ type SessionOptions struct {
 	FingerHint bool
 	// NoInput hides the typed input line in the TUI and places the hint directly under the title line.
 	NoInput bool
+	// HideHint hides the typing hint line under the session title (default false = show hint).
+	HideHint bool
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.

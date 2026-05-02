@@ -88,6 +88,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if err != nil {
 		return err
 	}
+	opts.HideHint = !settings.HintVisible()
 	provider, err := text.NewProvider(canonMode, cache, settings.WordsFile, settings.PassagesFile)
 	if err != nil {
 		return err

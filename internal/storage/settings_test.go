@@ -65,6 +65,23 @@ func TestSettingsStoreSaveLoadPassagesFile(t *testing.T) {
 	}
 }
 
+func TestAppSettingsHintVisible(t *testing.T) {
+	var a AppSettings
+	if !a.HintVisible() {
+		t.Fatal("missing show_hint should default to visible")
+	}
+	v := true
+	a.ShowHint = &v
+	if !a.HintVisible() {
+		t.Fatal("show_hint true")
+	}
+	f := false
+	a.ShowHint = &f
+	if a.HintVisible() {
+		t.Fatal("show_hint false")
+	}
+}
+
 func TestSettingsStoreLoadMissingFileReturnsDefaults(t *testing.T) {
 	store := NewSettingsStoreAt(filepath.Join(t.TempDir(), settingsJSONFile))
 	got, err := store.Load()

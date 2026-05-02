@@ -12,6 +12,7 @@ import (
 
 	"typer/internal/model"
 	"typer/internal/session"
+	"typer/internal/storage"
 	"typer/internal/text"
 	"typer/internal/ui"
 )
@@ -60,6 +61,14 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if err != nil {
 		return err
 	}
+	settingsStore, err := storage.NewSettingsStore()
+	if err != nil {
+		return err
+	}
+	settings, err := settingsStore.Load()
+	if err != nil {
+		return err
+	}
 	var baseline model.SessionResult
 	if useID != "" {
 		baseline, err = store.GetByID(useID)
@@ -80,6 +89,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
 	opts := model.SessionOptionsForReplay(baseline)
 	opts.NoInput = noInput
+	opts.HideHint = !settings.HintVisible()
 	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
 	if err != nil {
 		return err

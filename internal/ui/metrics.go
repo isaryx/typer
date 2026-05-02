@@ -40,6 +40,7 @@ func metricsInnerWidth(layoutWidth int) int {
 }
 
 // PrintMetricsTable renders session metrics; uses lipgloss on a terminal file, plain ASCII otherwise.
+// It does not emit a leading blank line (callers add spacing when needed).
 func PrintMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
 	tw := writerTerminalWidth(out)
 	inner := metricsInnerWidth(tw)
@@ -53,7 +54,6 @@ func PrintMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 }
 
 func printMetricsTablePlain(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool, boxInnerWidth int) {
-	fmt.Fprintln(out)
 	horizontalBar := strings.Repeat("─", TopMiddleWidth(boxInnerWidth))
 	boxBottomFmt := "╰%s╯\n"
 	boxInnerFmt := fmt.Sprintf("│ %%-%ds │\n", boxInnerWidth)
@@ -118,7 +118,6 @@ func printMetricsTableLipgloss(out io.Writer, heading string, gross, net, adjust
 	}
 	b.WriteString(RenderRoundedBottomPlain("", border, mw))
 
-	fmt.Fprintln(out)
 	fmt.Fprintln(out, b.String())
 	fmt.Fprintln(out)
 }

@@ -8,6 +8,16 @@ import (
 type AppSettings struct {
 	WordsFile    string `json:"words_file,omitempty"`
 	PassagesFile string `json:"passages_file,omitempty"`
+	// ShowHint controls the typing hint line. When nil (missing from JSON), the hint is shown.
+	ShowHint *bool `json:"show_hint,omitempty"`
+}
+
+// HintVisible reports whether the typing hint line should be shown. Missing config defaults to true.
+func (a AppSettings) HintVisible() bool {
+	if a.ShowHint == nil {
+		return true
+	}
+	return *a.ShowHint
 }
 
 type SettingsStore struct {

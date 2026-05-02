@@ -48,8 +48,10 @@ type typingSessionModel struct {
 	indefinite bool
 	// fingerHint enables touch-typing finger hints (US QWERTY diagram).
 	fingerHint bool
-	// noInput hides the "> …" input line; hint is shown directly under the heading instead.
+	// noInput hides the "> …" input line (hint still follows the session heading).
 	noInput bool
+	// hideHint hides the typing hint line under the session heading (from settings or SessionOptions).
+	hideHint bool
 	// replay, when set, holds the prior session for shadow trace and (if showReplayUI) replay chrome.
 	replay *model.SessionResult
 	// showReplayUI is true only for `typer replay`; ghost-from-start uses the normal header without replay lines.
@@ -66,7 +68,7 @@ type typingSessionModel struct {
 	replayClockStart  time.Time
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool) *typingSessionModel {
 	words := strings.Fields(prompt.Content)
 
 	shadowStrict := false
@@ -88,6 +90,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		showReplayUI:      showReplayUI,
 		fingerHint:        fingerHint,
 		noInput:           noInput,
+		hideHint:          hideHint,
 		shadowTrace:       shadowTrace,
 		shadowStrict:      shadowStrict,
 		shadowWords:       make([]string, 0, n),
@@ -151,7 +154,7 @@ func (m *typingSessionModel) View() string {
 	var b strings.Builder
 	b.WriteString(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
 	b.WriteString("\n")
-	if m.noInput {
+	if !m.hideHint {
 		b.WriteString(m.styles.meta.Width(tw).Render(inputHint))
 		b.WriteString("\n")
 	}
@@ -169,8 +172,6 @@ func (m *typingSessionModel) View() string {
 		}
 	}
 	if !m.noInput {
-		b.WriteString("\n\n")
-		b.WriteString(m.styles.meta.Width(tw).Render(inputHint))
 		b.WriteString("\n")
 		b.WriteString(m.styles.promptPrefix.Render("> "))
 		b.WriteString(m.renderInputWord())
@@ -187,8 +188,8 @@ func (m *typingSessionModel) View() string {
 	return b.String()
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint, noInput)
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint, noInput, hideHint)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

@@ -493,7 +493,7 @@ func TestRunSetRequiresAtLeastOneFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected runSet to fail without flags")
 	}
-	if !strings.Contains(err.Error(), "set requires --words-file and/or --passages-file") {
+	if !strings.Contains(err.Error(), "set requires --words-file, --passages-file, and/or --show-hint") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
@@ -568,6 +568,54 @@ func TestRunSetSavesAbsolutePathsForBothFiles(t *testing.T) {
 	}
 	if settings.PassagesFile != wantPassages {
 		t.Fatalf("PassagesFile = %q, want %q", settings.PassagesFile, wantPassages)
+	}
+}
+
+func TestRunSetShowHintOnlyPersists(t *testing.T) {
+	home := t.TempDir()
+	setTestUserDirs(t, home)
+
+	var out bytes.Buffer
+	if err := runSet([]string{"--show-hint", "off"}, &out); err != nil {
+		t.Fatalf("runSet: %v", err)
+	}
+	if !strings.Contains(out.String(), "Typing hint: off") {
+		t.Fatalf("expected confirmation, got %q", out.String())
+	}
+
+	store, err := storage.NewSettingsStore()
+	if err != nil {
+		t.Fatalf("NewSettingsStore: %v", err)
+	}
+	settings, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load settings: %v", err)
+	}
+	if settings.ShowHint == nil || *settings.ShowHint {
+		t.Fatalf("expected show_hint false, got %#v", settings.ShowHint)
+	}
+
+	out.Reset()
+	if err := runSet([]string{"--show-hint", "on"}, &out); err != nil {
+		t.Fatalf("runSet on: %v", err)
+	}
+	settings, err = store.Load()
+	if err != nil {
+		t.Fatalf("Load settings: %v", err)
+	}
+	if settings.ShowHint == nil || !*settings.ShowHint {
+		t.Fatalf("expected show_hint true, got %#v", settings.ShowHint)
+	}
+}
+
+func TestRunSetShowHintRejectsInvalid(t *testing.T) {
+	var out bytes.Buffer
+	err := runSet([]string{"--show-hint", "maybe"}, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), `--show-hint must be "on" or "off"`) {
+		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
 

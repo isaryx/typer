@@ -23,6 +23,7 @@ func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -42,6 +43,7 @@ func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -76,6 +78,7 @@ func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -101,6 +104,7 @@ func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.current = "hello"
 	m.commitCurrentWord()
@@ -120,6 +124,7 @@ func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -143,6 +148,7 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -205,6 +211,7 @@ func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.width = 16
 	out := m.renderWords(14)
@@ -220,6 +227,7 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -244,8 +252,30 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	got := m.View()
+	if !strings.Contains(got, "typer · words · non-strict") {
+		t.Fatalf("expected session heading in view, got %q", got)
+	}
+}
+
+func TestViewHideHintOmitsHintLine(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt, Mode: model.ModeWords},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		true,
+	)
+	got := m.View()
+	if strings.Contains(got, inputHint) {
+		t.Fatalf("expected hint hidden, got:\n%s", got)
+	}
 	if !strings.Contains(got, "typer · words · non-strict") {
 		t.Fatalf("expected session heading in view, got %q", got)
 	}
@@ -261,6 +291,7 @@ func TestViewNoInputPlacesHintUnderHeadingHidesPrompt(t *testing.T) {
 		false,
 		false,
 		true,
+		false,
 	)
 	got := m.View()
 	if strings.Contains(got, "> ") {
@@ -289,6 +320,7 @@ func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 		func() time.Time { return now },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -321,6 +353,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.aborted = true
 	m.endedAt = now.UTC()
@@ -344,6 +377,7 @@ func TestInitReturnsNilCommand(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	if cmd := m.Init(); cmd != nil {
 		t.Fatalf("expected nil init command, got %v", cmd)
@@ -357,6 +391,7 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -380,6 +415,7 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 		},
 		false,
 		nil,
+		false,
 		false,
 		false,
 		false,
@@ -412,6 +448,7 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.current = "go"
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -433,6 +470,7 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 				func() time.Time { return time.Unix(123, 0) },
 				false,
 				nil,
+				false,
 				false,
 				false,
 				false,
@@ -464,6 +502,7 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	m.wordIndex = 1
 	m.current = "w"
@@ -484,6 +523,7 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 		func() time.Time { return time.Unix(100, 0) },
 		false,
 		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
 		false,
 		false,
 		false,
@@ -533,6 +573,7 @@ func TestViewReplayTitleShowsSessionID(t *testing.T) {
 		true,
 		false,
 		false,
+		false,
 	)
 	v := m.View()
 	want := "Replay · " + sid + " | net 10.00 wpm"
@@ -555,6 +596,7 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 		false,
 		false,
 		false,
+		false,
 	)
 	v := m.View()
 	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
@@ -574,6 +616,7 @@ func TestViewFingerHintShowsFramedHands(t *testing.T) {
 		nil,
 		false,
 		true,
+		false,
 		false,
 	)
 	m.width = 88

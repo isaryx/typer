@@ -18,6 +18,7 @@ func runSet(args []string, stdout io.Writer) error {
 
 	wordsFile := fs.String("words-file", "", "Path to a newline-separated custom word list.")
 	passagesFile := fs.String("passages-file", "", "Path to a blank-line-separated custom passages file.")
+	showHint := fs.String("show-hint", "", `Typing hint under the title: "on" or "off" (default when unset: on).`)
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printSetHelp(stdout)
@@ -31,8 +32,22 @@ func runSet(args []string, stdout io.Writer) error {
 
 	wf := strings.TrimSpace(*wordsFile)
 	pf := strings.TrimSpace(*passagesFile)
-	if wf == "" && pf == "" {
-		return errors.New("set requires --words-file and/or --passages-file")
+	showHintArg := strings.TrimSpace(strings.ToLower(*showHint))
+	var showHintPtr *bool
+	switch showHintArg {
+	case "":
+		break
+	case "on", "true", "1", "yes":
+		v := true
+		showHintPtr = &v
+	case "off", "false", "0", "no":
+		v := false
+		showHintPtr = &v
+	default:
+		return fmt.Errorf(`set: --show-hint must be "on" or "off", got %q`, strings.TrimSpace(*showHint))
+	}
+	if wf == "" && pf == "" && showHintPtr == nil {
+		return errors.New("set requires --words-file, --passages-file, and/or --show-hint")
 	}
 
 	validateFile := func(label, path string) (string, error) {
@@ -73,6 +88,9 @@ func runSet(args []string, stdout io.Writer) error {
 		}
 		settings.PassagesFile = absPath
 	}
+	if showHintPtr != nil {
+		settings.ShowHint = showHintPtr
+	}
 
 	if err := settingsStore.Save(settings); err != nil {
 		return err
@@ -83,6 +101,13 @@ func runSet(args []string, stdout io.Writer) error {
 	}
 	if pf != "" {
 		fmt.Fprintf(stdout, "Custom passages file set to %s\n", settings.PassagesFile)
+	}
+	if showHintPtr != nil {
+		if *showHintPtr {
+			fmt.Fprintln(stdout, "Typing hint: on")
+		} else {
+			fmt.Fprintln(stdout, "Typing hint: off")
+		}
 	}
 	return nil
 }

@@ -18,7 +18,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Commands:")
 	fmt.Fprintln(out, "  start        Run an interactive typing session.")
-	fmt.Fprintln(out, "  set          Save custom words and/or passages file paths.")
+	fmt.Fprintln(out, "  set          Save custom corpus paths and typing hint preference.")
 	fmt.Fprintln(out, "  history      List recent sessions from local history.")
 	fmt.Fprintln(out, "  replay       Re-run a history session; compare metrics (-l, --nth, --id).")
 	fmt.Fprintln(out, "  stats        Summarize recent sessions.")
@@ -29,7 +29,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "Quick reference:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
-	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
+	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH] [--show-hint on|off]")
 	fmt.Fprintln(out, "  typer history [--last N]")
 	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID [--no-input]")
 	fmt.Fprintln(out, "  typer stats [--last N]")
@@ -65,14 +65,15 @@ func printStartHelp(out io.Writer) {
 }
 
 func printSetHelp(out io.Writer) {
-	fmt.Fprintln(out, "Save paths to custom corpus files (at least one flag is required).")
+	fmt.Fprintln(out, "Save paths to custom corpus files and whether to show the typing hint line (at least one option is required).")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
+	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH] [--show-hint on|off]")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
 	fmt.Fprintln(out, "      --words-file PATH     Newline-separated word list.")
 	fmt.Fprintln(out, "      --passages-file PATH  Blank-line-separated passage blocks.")
+	fmt.Fprintln(out, `      --show-hint on|off     Show or hide the hint line under the session title (default when unset: on).`)
 }
 
 func printHistoryHelp(out io.Writer) {
