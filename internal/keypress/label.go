@@ -8,7 +8,7 @@ import (
 )
 
 // maxDisplayLabelRunes caps pasted / IME text so the UI and history stay usable.
-const maxDisplayLabelRunes = 72
+const maxDisplayLabelRunes = 512
 
 // DisplayLabel returns a readable string for a key event (tea.Key String vs Keystroke
 // for modifiers), with small adjustments for empty/space and truncation. Bracketed paste
