@@ -188,7 +188,7 @@ func printStartResults(out io.Writer, results []model.SessionResult) {
 
 func printOneSessionResult(out io.Writer, r model.SessionResult) {
 	m := r.Metrics
-	printMetricsTable(out, "Session stats", m.GrossWPM, m.NetWPM, m.AdjustedWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
+	printMetricsTable(out, "Session Stats", m.GrossWPM, m.NetWPM, m.AdjustedWPM, m.Accuracy, m.Consistency, m.Errors, r.ElapsedMS, false)
 }
 
 func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {

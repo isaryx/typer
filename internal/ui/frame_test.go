@@ -26,7 +26,7 @@ func TestFrameBodyInnerWidth(t *testing.T) {
 }
 
 func TestTruncateTopCaption(t *testing.T) {
-	if got := TruncateTopCaption("Session stats", 80); got != "Session stats" {
+	if got := TruncateTopCaption("Session Stats", 80); got != "Session Stats" {
 		t.Fatalf("got %q", got)
 	}
 	long := strings.Repeat("x", 100)

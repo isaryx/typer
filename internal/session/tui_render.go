@@ -11,6 +11,14 @@ import (
 	"typer/internal/ui"
 )
 
+const (
+	// passageViewportLines is how many wrapped passage rows show inside the rounded frame.
+	passageViewportLines = 3
+	// passageScrollLeadLines keeps the active line this many rows above the viewport bottom
+	// when possible so the window scrolls earlier and one line of upcoming text stays visible.
+	passageScrollLeadLines = 1
+)
+
 func (m *typingSessionModel) termWidth() int {
 	if m.width > 0 {
 		return m.width
@@ -117,6 +125,44 @@ func formatReplayCompactLine(sr *model.SessionResult) string {
 	return fmt.Sprintf("Replay · %s | %s", lbl, stats)
 }
 
+// lineIndexForWord returns the wrapped line index containing words[wordIdx].
+func lineIndexForWord(firstWordIdx []int, wordIdx int) int {
+	if len(firstWordIdx) == 0 {
+		return 0
+	}
+	for k := len(firstWordIdx) - 1; k >= 0; k-- {
+		if firstWordIdx[k] <= wordIdx {
+			return k
+		}
+	}
+	return 0
+}
+
+// passageViewportStart picks the first visible line so the active line stays in view.
+// With passageScrollLeadLines, the active row is placed one line above the viewport bottom
+// when possible (early scroll / read-ahead below).
+func passageViewportStart(activeLine, totalLines, viewportH int) int {
+	if totalLines <= 0 || viewportH <= 0 {
+		return 0
+	}
+	if totalLines <= viewportH {
+		return 0
+	}
+	maxStart := totalLines - viewportH
+	targetRow := viewportH - 1 - passageScrollLeadLines
+	if targetRow < 0 {
+		targetRow = 0
+	}
+	start := activeLine - targetRow
+	if start < 0 {
+		start = 0
+	}
+	if start > maxStart {
+		start = maxStart
+	}
+	return start
+}
+
 func (m *typingSessionModel) renderPassageFrame() string {
 	tw := m.wrapWidth()
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
@@ -124,14 +170,26 @@ func (m *typingSessionModel) renderPassageFrame() string {
 	wordLbl := m.wordCountTopLabel()
 	topLine := ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
 
-	passage := m.renderMergedWords(m.promptInnerWidth())
-	lines := strings.Split(passage, "\n")
-	contentW := m.promptInnerWidth()
+	lineWidth := m.promptInnerWidth()
+	lines, firstWordIdx := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
+
+	activeW := m.wordIndex
+	if len(m.words) > 0 && activeW >= len(m.words) {
+		activeW = len(m.words) - 1
+	}
+	activeLine := lineIndexForWord(firstWordIdx, activeW)
+	start := passageViewportStart(activeLine, len(lines), passageViewportLines)
+	end := start + passageViewportLines
+	if end > len(lines) {
+		end = len(lines)
+	}
+	visible := lines[start:end]
+	contentW := lineWidth
 
 	var b strings.Builder
 	b.WriteString(topLine)
 	b.WriteString("\n")
-	for _, pl := range lines {
+	for _, pl := range visible {
 		b.WriteString(ui.RenderRoundedSide("", m.styles.border, contentW, pl))
 		b.WriteString("\n")
 	}
@@ -224,24 +282,36 @@ func (m *typingSessionModel) joinLineParts(parts []string, firstWordIndex int) s
 	return b.String()
 }
 
-func (m *typingSessionModel) renderWords(lineWidth int) string {
+// renderPassageWordSegment styles one word for passage layout; same logic as renderMergedWords.
+func (m *typingSessionModel) renderPassageWordSegment(i int, w string) string {
+	if !m.hasShadowReplay() {
+		return m.renderWordPiece(i, w)
+	}
+	return m.renderMergedWordPiece(i, w)
+}
+
+// collectWrappedWordLines lays out words into soft-wrapped lines. firstWordIdx[k] is the
+// index of the first word on line k.
+func (m *typingSessionModel) collectWrappedWordLines(lineWidth int, seg func(int, string) string) ([]string, []int) {
 	if lineWidth < 1 {
 		lineWidth = 1
 	}
 	var lines []string
+	var firstWordIdx []int
 	var parts []string
 	cur := 0
 	lineStartIdx := 0
 
 	for i, w := range m.words {
-		seg := m.renderWordPiece(i, w)
-		sw := lipgloss.Width(seg)
+		segStr := seg(i, w)
+		sw := lipgloss.Width(segStr)
 		sep := 0
 		if len(parts) > 0 {
 			sep = lipgloss.Width(m.interWordSeparator(i - 1))
 		}
 		if cur+sep+sw > lineWidth && len(parts) > 0 {
 			lines = append(lines, m.joinLineParts(parts, lineStartIdx))
+			firstWordIdx = append(firstWordIdx, lineStartIdx)
 			parts = nil
 			cur = 0
 			sep = 0
@@ -252,52 +322,24 @@ func (m *typingSessionModel) renderWords(lineWidth int) string {
 		if len(parts) > 0 {
 			cur += sep
 		}
-		parts = append(parts, seg)
+		parts = append(parts, segStr)
 		cur += sw
 	}
 	if len(parts) > 0 {
 		lines = append(lines, m.joinLineParts(parts, lineStartIdx))
+		firstWordIdx = append(firstWordIdx, lineStartIdx)
 	}
+	return lines, firstWordIdx
+}
+
+func (m *typingSessionModel) renderWords(lineWidth int) string {
+	lines, _ := m.collectWrappedWordLines(lineWidth, m.renderWordPiece)
 	return strings.Join(lines, "\n")
 }
 
 // renderMergedWords draws user + ghost on the same passage; without a trace it matches renderWords.
 func (m *typingSessionModel) renderMergedWords(lineWidth int) string {
-	if lineWidth < 1 {
-		lineWidth = 1
-	}
-	if !m.hasShadowReplay() {
-		return m.renderWords(lineWidth)
-	}
-	var lines []string
-	var parts []string
-	cur := 0
-	lineStartIdx := 0
-	for i, w := range m.words {
-		seg := m.renderMergedWordPiece(i, w)
-		sw := lipgloss.Width(seg)
-		sep := 0
-		if len(parts) > 0 {
-			sep = lipgloss.Width(m.interWordSeparator(i - 1))
-		}
-		if cur+sep+sw > lineWidth && len(parts) > 0 {
-			lines = append(lines, m.joinLineParts(parts, lineStartIdx))
-			parts = nil
-			cur = 0
-			sep = 0
-		}
-		if len(parts) == 0 {
-			lineStartIdx = i
-		}
-		if len(parts) > 0 {
-			cur += sep
-		}
-		parts = append(parts, seg)
-		cur += sw
-	}
-	if len(parts) > 0 {
-		lines = append(lines, m.joinLineParts(parts, lineStartIdx))
-	}
+	lines, _ := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
 	return strings.Join(lines, "\n")
 }
 

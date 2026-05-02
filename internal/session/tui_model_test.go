@@ -155,6 +155,44 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 	}
 }
 
+func TestLineIndexForWord(t *testing.T) {
+	first := []int{0, 8, 15}
+	if got := lineIndexForWord(first, 0); got != 0 {
+		t.Fatalf("word 0: got %d", got)
+	}
+	if got := lineIndexForWord(first, 7); got != 0 {
+		t.Fatalf("word 7: got %d", got)
+	}
+	if got := lineIndexForWord(first, 8); got != 1 {
+		t.Fatalf("word 8: got %d", got)
+	}
+	if got := lineIndexForWord(first, 20); got != 2 {
+		t.Fatalf("word 20: got %d", got)
+	}
+}
+
+func TestPassageViewportStart(t *testing.T) {
+	const h = passageViewportLines
+	if got := passageViewportStart(0, 10, h); got != 0 {
+		t.Fatalf("start at top: got %d", got)
+	}
+	if got := passageViewportStart(1, 10, h); got != 0 {
+		t.Fatalf("active on line 1: got %d want 0", got)
+	}
+	if got := passageViewportStart(2, 10, h); got != 1 {
+		t.Fatalf("active on line 2 (early scroll): got %d want 1", got)
+	}
+	if got := passageViewportStart(8, 10, h); got != 7 {
+		t.Fatalf("active on line 8: got %d want 7", got)
+	}
+	if got := passageViewportStart(9, 10, h); got != 7 {
+		t.Fatalf("active on last line: got %d want 7", got)
+	}
+	if got := passageViewportStart(0, 3, h); got != 0 {
+		t.Fatalf("short passage: got %d", got)
+	}
+}
+
 func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 	// Many one-letter "words"; each styled segment is wider than a bare rune but still tiny.
 	content := strings.TrimSpace(strings.Repeat("x ", 60))
