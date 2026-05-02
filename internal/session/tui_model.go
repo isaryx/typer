@@ -210,8 +210,21 @@ func (m *typingSessionModel) layoutAlignedInputLine(tw int) string {
 	return lipgloss.NewStyle().Width(tw).Align(align).Render(content)
 }
 
-func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, strict, indefinite bool, now func() time.Time, replayBaseline *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement) (typingSessionResult, error) {
-	m := newTypingSessionModel(prompt, strict, now, indefinite, replayBaseline, showReplayUI, fingerHint, noInput, hideHint, inputPlacement)
+// typingSessionRunOpts groups TUI flags passed from model.SessionOptions into runTypingSession.
+type typingSessionRunOpts struct {
+	strict         bool
+	indefinite     bool
+	now            func() time.Time
+	replayBaseline *model.SessionResult
+	showReplayUI   bool
+	fingerHint     bool
+	noInput        bool
+	hideHint       bool
+	inputPlacement model.InputPlacement
+}
+
+func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, o typingSessionRunOpts) (typingSessionResult, error) {
+	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

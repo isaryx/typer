@@ -19,7 +19,7 @@ func runSet(args []string, stdout io.Writer) error {
 
 	wordsFile := fs.String("words-file", "", "Words mode word list file.")
 	passagesFile := fs.String("passages-file", "", "Passages mode passages file.")
-	showHint := fs.String("show-hint", "", `Show or hide hint: on|off (default on).`)
+	showHint := fs.String("show-hint", "", `Hint visibility: on|off|yes|no|true|false|1|0 (omit = unchanged).`)
 	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc).`)
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -46,7 +46,7 @@ func runSet(args []string, stdout io.Writer) error {
 		v := false
 		showHintPtr = &v
 	default:
-		return fmt.Errorf(`set: --show-hint must be "on" or "off", got %q`, strings.TrimSpace(*showHint))
+		return fmt.Errorf("set: --show-hint must be one of on, off, yes, no, true, false, 1, 0, got %q", strings.TrimSpace(*showHint))
 	}
 	inputPosArg := strings.TrimSpace(*inputPosition)
 	var inputPlacement *model.InputPlacement

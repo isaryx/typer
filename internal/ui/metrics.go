@@ -12,40 +12,45 @@ import (
 
 const metricsSpeedControlHeader = "SPEED                        CONTROL"
 
-// writerTerminalWidth returns the layout width for metrics (same cap as the typing session wrap width).
-func writerTerminalWidth(out io.Writer) int {
-	const fallback = 80
-	f, ok := out.(*os.File)
-	if !ok {
-		return fallback
-	}
-	fd := int(f.Fd())
-	if !term.IsTerminal(fd) {
-		return fallback
-	}
-	w, _, err := term.GetSize(fd)
-	if err != nil || w < 24 {
-		return fallback
-	}
-	if w > MaxContentWidth {
-		return MaxContentWidth
-	}
-	return w
-}
-
 // metricsInnerWidth is the inner text width inside the metrics box (between side borders),
 // matching session.FrameBodyInnerWidth so the stats panel matches the prompt frame width.
 func metricsInnerWidth(layoutWidth int) int {
 	return FrameBodyInnerWidth(layoutWidth)
 }
 
+// metricsTerminalLayout returns layout width, inner box width, and whether lipgloss is appropriate for out
+// (single terminal read: same cap as the typing session wrap width).
+func metricsTerminalLayout(out io.Writer) (layoutW, innerW int, useLipgloss bool) {
+	const fallback = 80
+	layoutW = fallback
+	innerW = metricsInnerWidth(fallback)
+
+	f, ok := out.(*os.File)
+	if !ok {
+		return layoutW, innerW, false
+	}
+	fd := int(f.Fd())
+	if !term.IsTerminal(fd) {
+		return layoutW, innerW, false
+	}
+	useLipgloss = true
+	w, _, err := term.GetSize(fd)
+	if err != nil || w < 24 {
+		return layoutW, innerW, useLipgloss
+	}
+	if w > MaxContentWidth {
+		layoutW = MaxContentWidth
+	} else {
+		layoutW = w
+	}
+	innerW = metricsInnerWidth(layoutW)
+	return layoutW, innerW, useLipgloss
+}
+
 // PrintMetricsTable renders session metrics; uses lipgloss on a terminal file, plain ASCII otherwise.
 // It does not emit a leading blank line (callers add spacing when needed).
 func PrintMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
-	tw := writerTerminalWidth(out)
-	inner := metricsInnerWidth(tw)
-	f, ok := out.(*os.File)
-	useLip := ok && term.IsTerminal(int(f.Fd()))
+	_, inner, useLip := metricsTerminalLayout(out)
 	if useLip {
 		printMetricsTableLipgloss(out, heading, gross, net, adjusted, acc, cons, errCount, elapsedMS, summary, inner)
 		return

@@ -50,7 +50,17 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		baseline = b
 	}
 
-	tuiResult, err := runTypingSession(ctx, input, output, prompt, opts.Strict, opts.Indefinite, r.Now, baseline, showReplayUI, opts.FingerHint, opts.NoInput, opts.HideHint, opts.InputPlacement)
+	tuiResult, err := runTypingSession(ctx, input, output, prompt, typingSessionRunOpts{
+		strict:         opts.Strict,
+		indefinite:     opts.Indefinite,
+		now:            r.Now,
+		replayBaseline: baseline,
+		showReplayUI:   showReplayUI,
+		fingerHint:     opts.FingerHint,
+		noInput:        opts.NoInput,
+		hideHint:       opts.HideHint,
+		inputPlacement: opts.InputPlacement,
+	})
 	if err != nil {
 		return model.SessionResult{}, err
 	}

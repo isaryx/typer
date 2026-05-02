@@ -614,7 +614,7 @@ func TestRunSetShowHintRejectsInvalid(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), `--show-hint must be "on" or "off"`) {
+	if !strings.Contains(err.Error(), "set: --show-hint must be one of on, off, yes, no, true, false, 1, 0") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }
