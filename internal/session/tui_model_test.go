@@ -434,6 +434,27 @@ func TestInitReturnsNilCommand(t *testing.T) {
 	}
 }
 
+func TestUpdatePasteAppendsRunes(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	gotModel, _ := m.Update(tea.PasteMsg{Content: "he"})
+	updated := gotModel.(*typingSessionModel)
+	if updated.current != "he" {
+		t.Fatalf("after paste, current = %q, want %q", updated.current, "he")
+	}
+}
+
 func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 	m := newTypingSessionModel(
 		model.Prompt{Content: "hello"},

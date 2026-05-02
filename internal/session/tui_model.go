@@ -119,6 +119,14 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.width = 20
 		}
 		return m, nil
+	case tea.PasteMsg:
+		// v2: bracketed paste is a separate message (not KeyPressMsg with long Text).
+		if m.isDone() {
+			return m, tea.Quit
+		}
+		cmd := m.appendRunes([]rune(msg.Content))
+		m.status = ""
+		return m, cmd
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":

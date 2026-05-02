@@ -57,7 +57,7 @@ History and settings stay on your device (typical paths include `~/.config/typer
 
 ## Credits
 
-**UI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (MIT); [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (BSD-3-Clause).
+**UI:** [Bubble Tea v2](https://pkg.go.dev/charm.land/bubbletea/v2), [Lip Gloss v2](https://pkg.go.dev/charm.land/lipgloss/v2) (MIT); [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (BSD-3-Clause). Source repos: [bubbletea](https://github.com/charmbracelet/bubbletea), [lipgloss](https://github.com/charmbracelet/lipgloss).
 
 **Session IDs:** [oklog/ulid](https://github.com/oklog/ulid) ([spec](https://github.com/ulid/spec)), Apache-2.0.
 

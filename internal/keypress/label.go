@@ -10,9 +10,9 @@ import (
 // maxDisplayLabelRunes caps pasted / IME text so the UI and history stay usable.
 const maxDisplayLabelRunes = 72
 
-// DisplayLabel returns a readable string for a key event. It is based on
-// bubbletea's KeyPressMsg.String() with small adjustments for empty/space and
-// truncation for very long input (e.g. bracketed paste).
+// DisplayLabel returns a readable string for a key event (tea.Key String vs Keystroke
+// for modifiers), with small adjustments for empty/space and truncation. Bracketed paste
+// is not a key press in Bubble Tea v2; handle tea.PasteMsg separately.
 func DisplayLabel(msg tea.KeyPressMsg) string {
 	k := tea.Key(msg)
 	if k.Mod == 0 && k.Text == "" && k.Code == 0 {

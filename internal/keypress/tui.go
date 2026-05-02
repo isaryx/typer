@@ -62,6 +62,11 @@ func (m keyPressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.height = 5
 		}
 		return m, nil
+	case tea.PasteMsg:
+		label := truncateRunes(msg.Content, maxDisplayLabelRunes)
+		m.lastLabel = label
+		m.history = AppendHistory(m.history, label, historyMax)
+		return m, nil
 	case tea.KeyPressMsg:
 		label := DisplayLabel(msg)
 		m.lastLabel = label
