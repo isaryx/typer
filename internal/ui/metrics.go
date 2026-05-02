@@ -12,7 +12,7 @@ import (
 
 const metricsSpeedControlHeader = "SPEED                        CONTROL"
 
-// writerTerminalWidth returns a sensible content width for metrics layout, capped at MaxContentWidth.
+// writerTerminalWidth returns the layout width for metrics (same cap as the typing session wrap width).
 func writerTerminalWidth(out io.Writer) int {
 	const fallback = 80
 	f, ok := out.(*os.File)
@@ -33,14 +33,10 @@ func writerTerminalWidth(out io.Writer) int {
 	return w
 }
 
-// metricsInnerWidth is the inner text width inside the metrics box (between side borders).
-func metricsInnerWidth(termW int) int {
-	// "  ╭" + inner + "╮"  => inner = termW - 4 for top; inner rows "  │ " + content + " │" => content = termW - 6
-	inner := termW - 6
-	if inner < 36 {
-		inner = 36
-	}
-	return inner
+// metricsInnerWidth is the inner text width inside the metrics box (between side borders),
+// matching session.FrameBodyInnerWidth so the stats panel matches the prompt frame width.
+func metricsInnerWidth(layoutWidth int) int {
+	return FrameBodyInnerWidth(layoutWidth)
 }
 
 // PrintMetricsTable renders session metrics; uses lipgloss on a terminal file, plain ASCII otherwise.
@@ -59,10 +55,10 @@ func PrintMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc,
 func printMetricsTablePlain(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool, boxInnerWidth int) {
 	fmt.Fprintln(out)
 	horizontalBar := strings.Repeat("─", TopMiddleWidth(boxInnerWidth))
-	boxBottomFmt := "  ╰%s╯\n"
-	boxInnerFmt := fmt.Sprintf("  │ %%-%ds │\n", boxInnerWidth)
+	boxBottomFmt := "╰%s╯\n"
+	boxInnerFmt := fmt.Sprintf("│ %%-%ds │\n", boxInnerWidth)
 	twoColumnFmt := "%-16s %-10s  %-14s %s"
-	fmt.Fprintf(out, "%s", BuildRoundedTopPlain("  ", heading, boxInnerWidth))
+	fmt.Fprintf(out, "%s", BuildRoundedTopPlain("", heading, boxInnerWidth))
 	if summary {
 		fmt.Fprintf(out, boxInnerFmt, metricsSpeedControlHeader)
 		fmt.Fprintf(out, boxInnerFmt, fmt.Sprintf(twoColumnFmt, "Avg gross WPM", fmt.Sprintf("%.2f", gross), "Avg accuracy", fmt.Sprintf("%.2f%%", acc)))
@@ -95,7 +91,7 @@ func printMetricsTableLipgloss(out io.Writer, heading string, gross, net, adjust
 	}
 
 	mw := TopMiddleWidth(inner)
-	topLine := RenderRoundedTop("  ", border, meta, heading, mw)
+	topLine := RenderRoundedTop("", border, meta, heading, mw)
 
 	var innerLines []string
 	innerLines = append(innerLines, label.Width(inner).Render(metricsSpeedControlHeader))
@@ -117,10 +113,10 @@ func printMetricsTableLipgloss(out io.Writer, heading string, gross, net, adjust
 	b.WriteString(topLine)
 	b.WriteString("\n")
 	for _, line := range innerLines {
-		b.WriteString(RenderRoundedSide("  ", border, inner, line))
+		b.WriteString(RenderRoundedSide("", border, inner, line))
 		b.WriteString("\n")
 	}
-	b.WriteString(RenderRoundedBottomPlain("  ", border, mw))
+	b.WriteString(RenderRoundedBottomPlain("", border, mw))
 
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, b.String())

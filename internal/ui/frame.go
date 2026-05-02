@@ -13,6 +13,17 @@ func TopMiddleWidth(contentInner int) int {
 	return contentInner + 2
 }
 
+// FrameBodyInnerWidth is the padded text width between "│ " and " │" in RenderRoundedSide
+// when the frame's outer width (╭ through ╮ on the top row, │ through │ on body rows) is layoutWidth.
+// Session typing UI uses the same value as promptInnerWidth(wrapWidth).
+func FrameBodyInnerWidth(layoutWidth int) int {
+	w := layoutWidth - 4
+	if w < 1 {
+		return 1
+	}
+	return w
+}
+
 // TruncateTopCaption trims label rune-wise until " "+result+" " fits in middleCells.
 func TruncateTopCaption(label string, middleCells int) string {
 	head := strings.TrimSpace(label)

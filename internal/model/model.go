@@ -24,6 +24,8 @@ type SessionOptions struct {
 	Strict     bool
 	Indefinite bool
 	FingerHint bool
+	// NoInput hides the typed input line in the TUI and places the hint directly under the title line.
+	NoInput bool
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.

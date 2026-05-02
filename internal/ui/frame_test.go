@@ -13,6 +13,18 @@ func TestTopMiddleWidth(t *testing.T) {
 	}
 }
 
+func TestFrameBodyInnerWidth(t *testing.T) {
+	if got, want := FrameBodyInnerWidth(88), 84; got != want {
+		t.Fatalf("FrameBodyInnerWidth(88) = %d, want %d", got, want)
+	}
+	if got, want := FrameBodyInnerWidth(24), 20; got != want {
+		t.Fatalf("FrameBodyInnerWidth(24) = %d, want %d", got, want)
+	}
+	if got, want := FrameBodyInnerWidth(3), 1; got != want {
+		t.Fatalf("FrameBodyInnerWidth(3) = %d, want %d", got, want)
+	}
+}
+
 func TestTruncateTopCaption(t *testing.T) {
 	if got := TruncateTopCaption("Session stats", 80); got != "Session stats" {
 		t.Fatalf("got %q", got)

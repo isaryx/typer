@@ -54,11 +54,7 @@ func (m *typingSessionModel) suggestedFinger() Finger {
 
 // promptInnerWidth is the line width for passage text between "│ " and " │" manual borders.
 func (m *typingSessionModel) promptInnerWidth() int {
-	w := m.wrapWidth() - 4
-	if w < 1 {
-		return 1
-	}
-	return w
+	return ui.FrameBodyInnerWidth(m.wrapWidth())
 }
 
 func (m *typingSessionModel) sessionHeadingLine() string {

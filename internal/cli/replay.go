@@ -30,6 +30,8 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	var last bool
 	fs.BoolVar(&last, "last", false, "Replay the most recent session.")
 	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
+	var noInput bool
+	fs.BoolVar(&noInput, "no-input", false, "Hide the input line; show the typing hint under the title.")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printReplayHelp(stdout)
@@ -77,6 +79,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 
 	runner := session.NewRunner(text.NewStaticProvider(baseline.Prompt))
 	opts := model.SessionOptionsForReplay(baseline)
+	opts.NoInput = noInput
 	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
 	if err != nil {
 		return err

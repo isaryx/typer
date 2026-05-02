@@ -28,10 +28,10 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Quick reference:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "  typer history [--last N]")
-	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID")
+	fmt.Fprintln(out, "  typer replay -l | --nth N | --id ID [--no-input]")
 	fmt.Fprintln(out, "  typer stats [--last N]")
 	fmt.Fprintln(out, "  typer credits")
 	fmt.Fprintln(out, "  typer key-press")
@@ -50,7 +50,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
-	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost]")
+	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit the word \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -61,6 +61,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "  -i, --indefinite     After each finished session, start another until Ctrl+C or Esc (bare flag).")
 	fmt.Fprintln(out, "  -f, --finger-hint    Show US QWERTY finger hints for the next key (bare flag; omit for no hints).")
 	fmt.Fprintln(out, "      --no-ghost       Skip the ghost overlay from history (by default, the best prior run of the same text is used when a typing trace exists).")
+	fmt.Fprintln(out, "      --no-input       Hide the input line; show the typing hint directly under the title.")
 }
 
 func printSetHelp(out io.Writer) {
@@ -107,4 +108,5 @@ func printReplayHelp(out io.Writer) {
 	fmt.Fprintln(out, "  -l, --last      Most recent session.")
 	fmt.Fprintln(out, "      --nth int   N-th newest session (1 = newest).")
 	fmt.Fprintln(out, "      --id string Session id from history (id=... line).")
+	fmt.Fprintln(out, "      --no-input  Hide the input line; show the typing hint directly under the title.")
 }
