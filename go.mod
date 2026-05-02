@@ -1,13 +1,13 @@
 module typer
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/oklog/ulid/v2 v2.1.1
 	golang.org/x/term v0.36.0
-	golang.org/x/text v0.3.8
+	golang.org/x/text v0.36.0
 )
 
 require (

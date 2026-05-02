@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 )
@@ -25,7 +26,7 @@ const quotesCacheFilename = "quotes_cache.json"
 func NewQuoteCacheStore() (*QuoteCacheStore, error) {
 	cacheDir, err := appCacheDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("quote cache store: %w", err)
 	}
 	newPath := filepath.Join(cacheDir, quotesCacheFilename)
 

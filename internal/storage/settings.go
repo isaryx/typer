@@ -1,6 +1,9 @@
 package storage
 
-import "path/filepath"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 type AppSettings struct {
 	WordsFile    string `json:"words_file,omitempty"`
@@ -14,7 +17,7 @@ type SettingsStore struct {
 func NewSettingsStore() (*SettingsStore, error) {
 	cfg, err := appConfigDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("settings store: %w", err)
 	}
 	return NewSettingsStoreAt(filepath.Join(cfg, "settings.json")), nil
 }

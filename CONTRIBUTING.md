@@ -6,7 +6,7 @@ Thanks for helping improve `typer`.
 
 Requirements:
 
-- Go 1.24+
+- [Go](https://go.dev/dl/) — match the `go` version in [`go.mod`](go.mod) (or newer).
 
 Clone and run locally:
 

@@ -11,7 +11,7 @@ Cross-platform typing trainer CLI written in Go.
 
 ## Requirements
 
-Go **1.24+** (see `go.mod`).
+[Go](https://go.dev/dl/) — the `go` line in [`go.mod`](go.mod) is the language version this repo targets; use that toolchain or newer.
 
 ## Install
 

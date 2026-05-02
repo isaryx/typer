@@ -27,7 +27,7 @@ type HistoryStore struct {
 func NewHistoryStore() (*HistoryStore, error) {
 	cfg, err := appConfigDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("history store: %w", err)
 	}
 	return NewHistoryStoreAt(filepath.Join(cfg, "history.json")), nil
 }
@@ -70,7 +70,7 @@ func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
 	}
 	list, err := s.List(n)
 	if err != nil {
-		return model.SessionResult{}, err
+		return model.SessionResult{}, fmt.Errorf("nth newest session: %w", err)
 	}
 	if len(list) < n {
 		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history", len(list))
@@ -157,7 +157,7 @@ func (s *HistoryStore) read() (model.HistoryFile, error) {
 func appConfigDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("user config dir: %w", err)
 	}
 	return filepath.Join(base, "typer"), nil
 }
@@ -165,7 +165,7 @@ func appConfigDir() (string, error) {
 func appCacheDir() (string, error) {
 	base, err := os.UserCacheDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("user cache dir: %w", err)
 	}
 	return filepath.Join(base, "typer"), nil
 }
