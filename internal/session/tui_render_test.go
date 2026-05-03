@@ -8,6 +8,87 @@ import (
 	"typer/internal/model"
 )
 
+func TestViewQuoteModeSourceRelocatedToBottomWhenInputOnTopBorder(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{
+			Content: "hello world",
+			Mode:    model.ModeQuote,
+			Source:  "zenquotes",
+			Author:  "Someone",
+		},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalOnTopBorder, H: model.InputHorizontalCenter},
+		nil,
+	)
+	m.width = 88
+	v := m.View().Content
+	if strings.Contains(v, "> ") {
+		t.Fatalf("on-top border mode should not use > prompt: %q", v)
+	}
+	if !strings.Contains(v, "|") {
+		t.Fatalf("expected | … | input chrome on top border: %q", v)
+	}
+	if !strings.Contains(v, "@ZenQuotes") {
+		t.Fatalf("expected @ZenQuotes relocated to bottom border: %q", v)
+	}
+	if !strings.Contains(v, "by Someone") || !strings.Contains(v, "by Someone · @ZenQuotes") {
+		t.Fatalf("expected author and source combined on bottom border, got:\n%s", v)
+	}
+	idxTop := strings.Index(v, "╭")
+	idxZen := strings.Index(v, "@ZenQuotes")
+	if idxTop < 0 || idxZen < 0 || idxZen <= idxTop {
+		t.Fatalf("expected frame before @ZenQuotes (bottom row): top=%d zen=%d", idxTop, idxZen)
+	}
+}
+
+func TestViewOnBottomBorderCombinesAuthorAndSource(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{
+			Content: "hello world",
+			Mode:    model.ModeQuote,
+			Source:  "zenquotes",
+			Author:  "Someone",
+		},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalOnBottomBorder, H: model.InputHorizontalCenter},
+		nil,
+	)
+	m.width = 88
+	v := m.View().Content
+	if !strings.Contains(v, "by Someone · @ZenQuotes") {
+		t.Fatalf("expected author and source combined, got:\n%s", v)
+	}
+	if strings.Count(v, "@ZenQuotes") != 1 {
+		t.Fatalf("expected single @ZenQuotes, got %d in:\n%s", strings.Count(v, "@ZenQuotes"), v)
+	}
+	i := strings.Index(v, "╭")
+	if i < 0 {
+		t.Fatal("expected frame start")
+	}
+	rest := v[i:]
+	ln := rest
+	if j := strings.Index(rest, "\n"); j >= 0 {
+		ln = rest[:j]
+	}
+	if !strings.Contains(ln, "@ZenQuotes") || !strings.Contains(ln, "by Someone") {
+		t.Fatalf("on-bottom: combined meta should be on top border row, got: %q", ln)
+	}
+}
+
 func TestViewQuoteModeShowsSourceInTopBorder(t *testing.T) {
 	m := newTypingSessionModel(
 		model.Prompt{

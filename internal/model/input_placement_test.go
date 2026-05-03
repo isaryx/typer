@@ -14,6 +14,10 @@ func TestParseInputPosition(t *testing.T) {
 		{"tl", InputPlacement{V: InputVerticalTop, H: InputHorizontalLeft}},
 		{"BC", InputPlacement{V: InputVerticalBottom, H: InputHorizontalCenter}},
 		{" br ", InputPlacement{V: InputVerticalBottom, H: InputHorizontalRight}},
+		{"on-top", InputPlacement{V: InputVerticalOnTopBorder, H: InputHorizontalCenter}},
+		{"on-bottom", InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}},
+		{"ot", InputPlacement{V: InputVerticalOnTopBorder, H: InputHorizontalCenter}},
+		{"ob", InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}},
 	}
 	for _, tc := range cases {
 		got, err := ParseInputPosition(tc.in)
@@ -53,5 +57,18 @@ func TestInputPlacementCanonicalString(t *testing.T) {
 	}
 	if got, err := ParseInputPosition(canon); err != nil || got != p {
 		t.Fatalf("round-trip: err=%v got=%#v", err, got)
+	}
+}
+
+func TestBorderPlacementCanonicalRoundTrip(t *testing.T) {
+	for _, p := range []InputPlacement{
+		{V: InputVerticalOnTopBorder, H: InputHorizontalCenter},
+		{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter},
+	} {
+		canon := p.CanonicalString()
+		got, err := ParseInputPosition(canon)
+		if err != nil || got != p {
+			t.Fatalf("%#v -> %q -> %#v err=%v", p, canon, got, err)
+		}
 	}
 }

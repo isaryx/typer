@@ -131,6 +131,26 @@ func RenderRoundedTop(marginLeft string, border, caption lipgloss.Style, label s
 	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
 }
 
+// RenderRoundedTopCenterBorder draws ╭ + dashes + centerStyled + dashes + ╮; centerStyled must already be rendered (may contain ANSI).
+func RenderRoundedTopCenterBorder(marginLeft string, border lipgloss.Style, centerStyled string, middleCells int) string {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := rem / 2
+	right := rem - left
+	core := lipgloss.JoinHorizontal(lipgloss.Top,
+		border.Render("╭"+strings.Repeat("─", left)),
+		centerStyled,
+		border.Render(strings.Repeat("─", right)+"╮"),
+	)
+	if marginLeft == "" {
+		return core
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
+}
+
 // RenderRoundedSide draws │ + padded inner + │.
 func RenderRoundedSide(marginLeft string, border lipgloss.Style, innerWidth int, inner string) string {
 	padded := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Left).Render(inner)
@@ -154,6 +174,75 @@ func RenderRoundedBottomPlain(marginLeft string, border lipgloss.Style, middleCe
 		return core
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
+}
+
+// RenderRoundedBottomHalves draws ╰ + left caption half + right caption half + ╯ (same segment split as RenderRoundedTopHalves).
+func RenderRoundedBottomHalves(marginLeft string, border, caption lipgloss.Style, leftLabel, rightLabel string, middleCells int) string {
+	if middleCells < 4 {
+		combined := strings.TrimSpace(strings.TrimSpace(leftLabel) + " · " + strings.TrimSpace(rightLabel))
+		combined = strings.TrimSpace(combined)
+		if combined == "" {
+			return RenderRoundedBottomPlain(marginLeft, border, middleCells)
+		}
+		capPlain, d1 := FitBottomCaption(combined, middleCells, 1)
+		return RenderRoundedBottomCaption(marginLeft, border, caption, d1, capPlain, 1)
+	}
+	leftHalf := middleCells / 2
+	rightHalf := middleCells - leftHalf
+	leftSeg := leftCaptionSegment(leftLabel, leftHalf, border, caption)
+	rightSeg := rightCaptionSegment(rightLabel, rightHalf, border, caption)
+	core := lipgloss.JoinHorizontal(lipgloss.Top,
+		border.Render("╰"),
+		leftSeg,
+		rightSeg,
+		border.Render("╯"),
+	)
+	if marginLeft == "" {
+		return core
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
+}
+
+// RenderRoundedBottomCenterBorder draws ╰ + dashes + centerStyled + dashes + ╯.
+func RenderRoundedBottomCenterBorder(marginLeft string, border lipgloss.Style, centerStyled string, middleCells int) string {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := rem / 2
+	right := rem - left
+	core := lipgloss.JoinHorizontal(lipgloss.Top,
+		border.Render("╰"+strings.Repeat("─", left)),
+		centerStyled,
+		border.Render(strings.Repeat("─", right)+"╯"),
+	)
+	if marginLeft == "" {
+		return core
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
+}
+
+// CenterBorderCaretX returns the 0-based column for the terminal insertion caret immediately after
+// insertionPrefix inside the centered segment (same geometry as RenderRoundedTopCenterBorder /
+// RenderRoundedBottomCenterBorder). topRow selects ╭ vs ╰ for the left corner run.
+func CenterBorderCaretX(topRow bool, marginLeft string, border lipgloss.Style, middleCells int, centerStyled, insertionPrefix string) int {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := rem / 2
+	corner := "╭"
+	if !topRow {
+		corner = "╰"
+	}
+	leftSeg := border.Render(corner + strings.Repeat("─", left))
+	marginW := 0
+	if marginLeft != "" {
+		marginW = lipgloss.Width(lipgloss.NewStyle().Render(marginLeft))
+	}
+	return marginW + lipgloss.Width(leftSeg) + lipgloss.Width(insertionPrefix)
 }
 
 // FitBottomCaption fits caption (no leading space) for the bottom border row; returns

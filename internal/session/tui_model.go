@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"io"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"typer/internal/model"
+	"typer/internal/ui"
 )
 
 const inputHint = "Hint: type the highlighted word, then Space to advance."
@@ -101,7 +103,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		shadowStrict:      shadowStrict,
 		shadowWords:       make([]string, 0, n),
 		shadowWordMatches: make([]bool, 0, n),
-		bellOut:           bellOut,
+		bellOut: bellOut,
 	}
 }
 
@@ -167,6 +169,8 @@ func (m *typingSessionModel) View() tea.View {
 
 	tw := m.wrapWidth()
 	var b strings.Builder
+	var cur *tea.Cursor
+
 	b.WriteString(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
 	b.WriteString("\n")
 	if !m.hideHint {
@@ -182,10 +186,21 @@ func (m *typingSessionModel) View() tea.View {
 	topInput := showInput && m.inputPlacement.V == model.InputVerticalTop
 	bottomInput := showInput && m.inputPlacement.V == model.InputVerticalBottom
 	if topInput {
-		b.WriteString(m.layoutAlignedInputLine(tw))
+		raw := m.promptInputStyled()
+		align := m.inputAlign()
+		line := lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
+		cur = m.inputBarCursor(caretXAligned(tw, align, raw), strings.Count(b.String(), "\n"))
+		b.WriteString(line)
 		b.WriteString("\n")
 	}
-	b.WriteString(m.renderPassageFrame())
+
+	passStart := strings.Count(b.String(), "\n")
+	passStr, pcx, pcy, pOk := m.renderPassageFrameWithCursor(passStart)
+	b.WriteString(passStr)
+	if pOk {
+		cur = m.inputBarCursor(pcx, pcy)
+	}
+
 	if m.fingerHint {
 		sf := m.suggestedFinger()
 		if sf != FingerUnknown {
@@ -195,7 +210,11 @@ func (m *typingSessionModel) View() tea.View {
 	}
 	if bottomInput {
 		b.WriteString("\n")
-		b.WriteString(m.layoutAlignedInputLine(tw))
+		raw := m.promptInputStyled()
+		align := m.inputAlign()
+		line := lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
+		cur = m.inputBarCursor(caretXAligned(tw, align, raw), strings.Count(b.String(), "\n"))
+		b.WriteString(line)
 	}
 	if m.status != "" {
 		b.WriteString("\n")
@@ -206,19 +225,70 @@ func (m *typingSessionModel) View() tea.View {
 		b.WriteString(m.styles.meta.Width(tw).Render("Indefinite mode — Ctrl+C or Esc to stop"))
 	}
 	b.WriteString("\n")
-	return tea.NewView(b.String())
+
+	v := tea.NewView(b.String())
+	v.Cursor = cur
+	return v
+}
+
+func (m *typingSessionModel) inputAlign() lipgloss.Position {
+	switch m.inputPlacement.H {
+	case model.InputHorizontalCenter:
+		return lipgloss.Center
+	case model.InputHorizontalRight:
+		return lipgloss.Right
+	default:
+		return lipgloss.Left
+	}
+}
+
+// inputBarCursor builds the terminal cursor at (x,y), colored like the typed input (good vs bad).
+func (m *typingSessionModel) inputBarCursor(x, y int) *tea.Cursor {
+	c := tea.NewCursor(x, y)
+	c.Shape = tea.CursorBar
+	c.Blink = true
+	c.Color = m.inputCursorColor()
+	return c
+}
+
+func (m *typingSessionModel) inputCursorColor() color.Color {
+	if m.wordIndex >= len(m.words) {
+		return lipgloss.Color(ui.ColorInputFg)
+	}
+	target := []rune(m.words[m.wordIndex])
+	typed := []rune(m.current)
+	for i := range typed {
+		if i < len(target) && typed[i] != target[i] {
+			return lipgloss.Color(ui.ColorInputBadFg)
+		}
+		if i >= len(target) {
+			return lipgloss.Color(ui.ColorInputBadFg)
+		}
+	}
+	return lipgloss.Color(ui.ColorInputFg)
+}
+
+func caretXAligned(tw int, align lipgloss.Position, rawStyled string) int {
+	w := lipgloss.Width(rawStyled)
+	switch align {
+	case lipgloss.Center:
+		return (tw-w)/2 + w
+	case lipgloss.Right:
+		start := tw - w
+		x := start + w
+		if x >= tw {
+			return tw - 1
+		}
+		return x
+	default:
+		return w
+	}
 }
 
 func (m *typingSessionModel) layoutAlignedInputLine(tw int) string {
-	content := m.styles.promptPrefix.Render("> ") + m.renderInputWord()
-	align := lipgloss.Left
-	switch m.inputPlacement.H {
-	case model.InputHorizontalCenter:
-		align = lipgloss.Center
-	case model.InputHorizontalRight:
-		align = lipgloss.Right
-	}
-	return lipgloss.NewStyle().Width(tw).Align(align).Render(content)
+	raw := m.promptInputStyled()
+	align := m.inputAlign()
+	return lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
 }
 
 // typingSessionRunOpts groups TUI flags passed from model.SessionOptions into runTypingSession.

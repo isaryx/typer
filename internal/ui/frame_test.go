@@ -36,6 +36,25 @@ func TestTruncateTopCaption(t *testing.T) {
 	}
 }
 
+func TestCenterBorderCaretXMatchesLayout(t *testing.T) {
+	border := lipgloss.NewStyle()
+	const middleCells = 40
+	center := border.Render("|") + " hi " + border.Render("|")
+	prefix := border.Render("|") + " hi"
+	x := CenterBorderCaretX(true, "", border, middleCells, center, prefix)
+	leftW := lipgloss.Width(center)
+	rem := middleCells - leftW
+	if rem < 0 {
+		rem = 0
+	}
+	left := rem / 2
+	leftSeg := border.Render("╭" + strings.Repeat("─", left))
+	wantX := lipgloss.Width(leftSeg) + lipgloss.Width(prefix)
+	if x != wantX {
+		t.Fatalf("CenterBorderCaretX=%d want %d", x, wantX)
+	}
+}
+
 func TestRenderRoundedTopHalvesWidth(t *testing.T) {
 	border := lipgloss.NewStyle()
 	cap := lipgloss.NewStyle()
@@ -44,6 +63,29 @@ func TestRenderRoundedTopHalvesWidth(t *testing.T) {
 	ref := RenderRoundedTop("", border, cap, "x", middleCells)
 	if lipgloss.Width(line) != lipgloss.Width(ref) {
 		t.Fatalf("halves width %d != single-caption width %d", lipgloss.Width(line), lipgloss.Width(ref))
+	}
+}
+
+func TestRenderRoundedBottomHalvesWidth(t *testing.T) {
+	border := lipgloss.NewStyle()
+	cap := lipgloss.NewStyle()
+	const middleCells = 40
+	line := RenderRoundedBottomHalves("", border, cap, "Left", "Right", middleCells)
+	ref := RenderRoundedBottomPlain("", border, middleCells)
+	if lipgloss.Width(line) != lipgloss.Width(ref) {
+		t.Fatalf("bottom halves width %d != plain bottom width %d", lipgloss.Width(line), lipgloss.Width(ref))
+	}
+}
+
+func TestRenderRoundedTopCenterBorderWidth(t *testing.T) {
+	border := lipgloss.NewStyle()
+	cap := lipgloss.NewStyle().Bold(true)
+	const middleCells = 40
+	styled := cap.Render("> hello")
+	line := RenderRoundedTopCenterBorder("", border, styled, middleCells)
+	ref := RenderRoundedTop("", border, lipgloss.NewStyle(), "x", middleCells)
+	if lipgloss.Width(line) != lipgloss.Width(ref) {
+		t.Fatalf("center top width %d != ref width %d", lipgloss.Width(line), lipgloss.Width(ref))
 	}
 }
 

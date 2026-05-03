@@ -415,7 +415,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 	}
 }
 
-func TestInitReturnsNilCommand(t *testing.T) {
+func TestInitReturnsNil(t *testing.T) {
 	m := newTypingSessionModel(
 		model.Prompt{Content: helloWorldPrompt},
 		false,
@@ -430,7 +430,23 @@ func TestInitReturnsNilCommand(t *testing.T) {
 		nil,
 	)
 	if cmd := m.Init(); cmd != nil {
-		t.Fatalf("expected nil init command, got %v", cmd)
+		t.Fatalf("expected nil init command (terminal cursor handles blink), got %v", cmd)
+	}
+	mNoIn := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		true, // noInput
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	if cmd := mNoIn.Init(); cmd != nil {
+		t.Fatalf("expected nil init when --no-input, got %v", cmd)
 	}
 }
 

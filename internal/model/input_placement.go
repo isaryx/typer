@@ -11,6 +11,10 @@ type InputVertical uint8
 const (
 	InputVerticalBottom InputVertical = iota
 	InputVerticalTop
+	// InputVerticalOnTopBorder places the typed input centered in the passage frame top border (╭─╮).
+	InputVerticalOnTopBorder
+	// InputVerticalOnBottomBorder places the typed input centered in the passage frame bottom border (╰─╯).
+	InputVerticalOnBottomBorder
 )
 
 // Horizontal alignment of the typed input line within the content width.
@@ -36,6 +40,12 @@ func DefaultInputPlacement() InputPlacement {
 
 // CanonicalString returns a stable form for JSON storage and CLI display (e.g. "bottom-left").
 func (p InputPlacement) CanonicalString() string {
+	switch p.V {
+	case InputVerticalOnTopBorder:
+		return "on-top"
+	case InputVerticalOnBottomBorder:
+		return "on-bottom"
+	}
 	var vert string
 	switch p.V {
 	case InputVerticalTop:
@@ -55,7 +65,7 @@ func (p InputPlacement) CanonicalString() string {
 	return vert + "-" + horiz
 }
 
-// Shorthand: tl, tc, tr, bl, bc, br (top/bottom × left/center/right).
+// Shorthand: tl, tc, tr, bl, bc, br (top/bottom × left/center/right); ot, ob (on top/bottom border).
 var inputPositionShorthand = map[string]InputPlacement{
 	"tl": {V: InputVerticalTop, H: InputHorizontalLeft},
 	"tc": {V: InputVerticalTop, H: InputHorizontalCenter},
@@ -63,13 +73,21 @@ var inputPositionShorthand = map[string]InputPlacement{
 	"bl": {V: InputVerticalBottom, H: InputHorizontalLeft},
 	"bc": {V: InputVerticalBottom, H: InputHorizontalCenter},
 	"br": {V: InputVerticalBottom, H: InputHorizontalRight},
+	"ot": {V: InputVerticalOnTopBorder, H: InputHorizontalCenter},
+	"ob": {V: InputVerticalOnBottomBorder, H: InputHorizontalCenter},
 }
 
-// ParseInputPosition parses values like "top-left", "bottom-center", or shorthand "tl", "bc".
+// ParseInputPosition parses values like "top-left", "bottom-center", "on-top", or shorthand "tl", "bc", "ot".
 func ParseInputPosition(s string) (InputPlacement, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	if s == "" {
 		return InputPlacement{}, fmt.Errorf(`input position: empty (expected e.g. "bottom-left", "bc", "top-center")`)
+	}
+	switch s {
+	case "on-top":
+		return InputPlacement{V: InputVerticalOnTopBorder, H: InputHorizontalCenter}, nil
+	case "on-bottom":
+		return InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}, nil
 	}
 	if len(s) == 2 {
 		if p, ok := inputPositionShorthand[s]; ok {

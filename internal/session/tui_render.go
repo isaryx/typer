@@ -164,19 +164,99 @@ func passageViewportStart(activeLine, totalLines, viewportH int) int {
 	return start
 }
 
-func (m *typingSessionModel) renderPassageFrame() string {
+func (m *typingSessionModel) renderStyledInputLine() string {
+	if m.inputOnTopBorder() || m.inputOnBottomBorder() {
+		return m.borderChromeCenterStyled()
+	}
+	return m.promptInputStyled()
+}
+
+func (m *typingSessionModel) promptInputStyled() string {
+	return m.styles.promptPrefix.Render("> ") + m.renderInputWord()
+}
+
+// borderInsertionPrefix is "| …typed" up to the caret (pipe matches frame tone via border style).
+func (m *typingSessionModel) borderInsertionPrefix() string {
+	return m.styles.border.Render("|") + " " + m.renderInputWord()
+}
+
+// borderChromeCenterStyled is "| … |" between the horizontal rules (ASCII pipes read cleanly in most fonts).
+func (m *typingSessionModel) borderChromeCenterStyled() string {
+	return m.borderInsertionPrefix() + " " + m.styles.border.Render("|")
+}
+
+func (m *typingSessionModel) inputOnTopBorder() bool {
+	return !m.noInput && !m.isDone() && m.inputPlacement.V == model.InputVerticalOnTopBorder
+}
+
+func (m *typingSessionModel) inputOnBottomBorder() bool {
+	return !m.noInput && !m.isDone() && m.inputPlacement.V == model.InputVerticalOnBottomBorder
+}
+
+// footerMetaCombinedLabel combines "by Author" and @source for on-top (bottom border halves) and
+// on-bottom (top-right half alongside word count).
+func (m *typingSessionModel) footerMetaCombinedLabel() string {
+	author := strings.TrimSpace(formatByCaption(m.prompt.Author))
+	var src string
+	if m.prompt.Mode == model.ModeQuote {
+		src = strings.TrimSpace(text.QuoteFrameSourceCaption(m.prompt.Source))
+	}
+	switch {
+	case author != "" && src != "":
+		return author + " · " + src
+	case author != "":
+		return author
+	case src != "":
+		return src
+	default:
+		return ""
+	}
+}
+
+// relocatedFooterBottomLine draws the bottom border when the top border is used for input (on-top),
+// carrying word count on the left and footerMetaCombinedLabel on the right when present.
+func (m *typingSessionModel) relocatedFooterBottomLine(inner int) string {
+	if right := m.footerMetaCombinedLabel(); right != "" {
+		return ui.RenderRoundedBottomHalves("", m.styles.border, m.styles.meta, m.wordCountTopLabel(), right, inner)
+	}
+	capPlain, d1 := ui.FitBottomCaption(m.wordCountTopLabel(), inner, 1)
+	return ui.RenderRoundedBottomCaption("", m.styles.border, m.styles.meta, d1, capPlain, 1)
+}
+
+// renderPassageFrameWithCursor renders the passage frame; startRow is the 0-based line index of the
+// frame's top border in the overall view. When ok is true, cx/cy are the terminal caret position for
+// on-top / on-bottom border input.
+func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content string, cx, cy int, ok bool) {
 	tw := m.wrapWidth()
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
 
 	wordLbl := m.wordCountTopLabel()
+	onTopIn := m.inputOnTopBorder()
+	onBottomIn := m.inputOnBottomBorder()
+	combinedMeta := m.footerMetaCombinedLabel()
+
 	var topLine string
-	if m.prompt.Mode == model.ModeQuote {
+	switch {
+	case onTopIn:
+		cs := m.borderChromeCenterStyled()
+		topLine = ui.RenderRoundedTopCenterBorder("", m.styles.border, cs, inner)
+		cx = ui.CenterBorderCaretX(true, "", m.styles.border, inner, cs, m.borderInsertionPrefix())
+		cy = startRow
+		ok = true
+	case onBottomIn:
+		// Input uses the bottom rule; combined author · @source on the top-right border (like default quote).
+		if combinedMeta != "" {
+			topLine = ui.RenderRoundedTopHalves("", m.styles.border, m.styles.meta, wordLbl, combinedMeta, inner)
+		} else {
+			topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
+		}
+	case m.prompt.Mode == model.ModeQuote:
 		if cap := strings.TrimSpace(text.QuoteFrameSourceCaption(m.prompt.Source)); cap != "" {
 			topLine = ui.RenderRoundedTopHalves("", m.styles.border, m.styles.meta, wordLbl, cap, inner)
 		} else {
 			topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
 		}
-	} else {
+	default:
 		topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
 	}
 
@@ -196,6 +276,8 @@ func (m *typingSessionModel) renderPassageFrame() string {
 	visible := lines[start:end]
 	contentW := lineWidth
 
+	author := strings.TrimSpace(formatByCaption(m.prompt.Author))
+
 	var b strings.Builder
 	b.WriteString(topLine)
 	b.WriteString("\n")
@@ -204,15 +286,31 @@ func (m *typingSessionModel) renderPassageFrame() string {
 		b.WriteString("\n")
 	}
 
-	caption := formatByCaption(m.prompt.Author)
-	if caption == "" {
-		b.WriteString(ui.RenderRoundedBottomPlain("", m.styles.border, inner))
-		return b.String()
+	if onBottomIn {
+		cs := m.borderChromeCenterStyled()
+		b.WriteString(ui.RenderRoundedBottomCenterBorder("", m.styles.border, cs, inner))
+		cx = ui.CenterBorderCaretX(false, "", m.styles.border, inner, cs, m.borderInsertionPrefix())
+		cy = startRow + 1 + len(visible)
+		ok = true
+		return b.String(), cx, cy, ok
 	}
 
-	capPlain, d1 := ui.FitBottomCaption(caption, inner, 1)
-	b.WriteString(ui.RenderRoundedBottomCaption("", m.styles.border, m.styles.meta, d1, capPlain, 1))
-	return b.String()
+	if author != "" && !onTopIn {
+		capPlain, d1 := ui.FitBottomCaption(author, inner, 1)
+		b.WriteString(ui.RenderRoundedBottomCaption("", m.styles.border, m.styles.meta, d1, capPlain, 1))
+		return b.String(), 0, 0, false
+	}
+	if onTopIn {
+		b.WriteString(m.relocatedFooterBottomLine(inner))
+		return b.String(), cx, cy, ok
+	}
+	b.WriteString(ui.RenderRoundedBottomPlain("", m.styles.border, inner))
+	return b.String(), 0, 0, false
+}
+
+func (m *typingSessionModel) renderPassageFrame() string {
+	s, _, _, _ := m.renderPassageFrameWithCursor(0)
+	return s
 }
 
 func (m *typingSessionModel) renderWordPiece(i int, w string) string {
