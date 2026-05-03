@@ -32,7 +32,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	fs.BoolVar(&last, "last", false, "Newest session.")
 	fs.BoolVar(&last, "l", false, "Shorthand for --last.")
 	var noInput bool
-	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
+	fs.BoolVar(&noInput, "no-input", false, "Hide input line.")
 	var noAudible bool
 	fs.BoolVar(&noAudible, "no-audible", false, "Disable terminal bell on mistakes.")
 	if err := fs.Parse(args); err != nil {

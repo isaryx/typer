@@ -32,10 +32,19 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		return model.SessionResult{}, err
 	}
 
-	prompt, err := r.Provider.Next(ctx, text.Constraints{
+	c := text.Constraints{
 		Words:  opts.Words,
 		Source: opts.Source,
-	})
+	}
+	var prompt model.Prompt
+	var err error
+	if opts.RemoteQuoteFetchSplash {
+		prompt, err = runQuoteFetchSplash(ctx, output, func() (model.Prompt, error) {
+			return r.Provider.Next(ctx, c)
+		})
+	} else {
+		prompt, err = r.Provider.Next(ctx, c)
+	}
 	if err != nil {
 		return model.SessionResult{}, err
 	}

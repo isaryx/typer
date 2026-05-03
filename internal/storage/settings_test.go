@@ -72,6 +72,20 @@ func TestAppSettingsInputPlacementDefault(t *testing.T) {
 	}
 }
 
+func TestAppSettingsQuoteRemoteIsEnabled(t *testing.T) {
+	var a AppSettings
+	if !a.QuoteRemoteIsEnabled("zenquotes") {
+		t.Fatal("nil map should default remote on")
+	}
+	a = AppSettings{QuoteRemoteEnabled: map[string]bool{"zenquotes": false}}
+	if a.QuoteRemoteIsEnabled("zenquotes") {
+		t.Fatal("explicit false should disable")
+	}
+	if !a.QuoteRemoteIsEnabled("typefit") {
+		t.Fatal("missing key should default to on")
+	}
+}
+
 func TestAppSettingsHintVisible(t *testing.T) {
 	var a AppSettings
 	if !a.HintVisible() {
@@ -95,7 +109,7 @@ func TestSettingsStoreLoadMissingFileReturnsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got != (AppSettings{}) {
+	if got.WordsFile != "" || got.PassagesFile != "" || got.ShowHint != nil || got.InputPosition != "" || got.QuoteRemoteEnabled != nil {
 		t.Fatalf("expected zero-value settings, got %#v", got)
 	}
 }

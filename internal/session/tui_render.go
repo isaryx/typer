@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"typer/internal/model"
+	"typer/internal/text"
 	"typer/internal/ui"
 )
 
@@ -168,7 +169,16 @@ func (m *typingSessionModel) renderPassageFrame() string {
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
 
 	wordLbl := m.wordCountTopLabel()
-	topLine := ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
+	var topLine string
+	if m.prompt.Mode == model.ModeQuote {
+		if cap := strings.TrimSpace(text.QuoteFrameSourceCaption(m.prompt.Source)); cap != "" {
+			topLine = ui.RenderRoundedTopHalves("", m.styles.border, m.styles.meta, wordLbl, cap, inner)
+		} else {
+			topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
+		}
+	} else {
+		topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
+	}
 
 	lineWidth := m.promptInnerWidth()
 	lines, firstWordIdx := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)

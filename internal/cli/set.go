@@ -11,7 +11,18 @@ import (
 
 	"typer/internal/model"
 	"typer/internal/storage"
+	"typer/internal/text"
 )
+
+// quoteSourceFlagList accumulates repeated --quote-source values.
+type quoteSourceFlagList []string
+
+func (q *quoteSourceFlagList) String() string { return "" }
+
+func (q *quoteSourceFlagList) Set(s string) error {
+	*q = append(*q, s)
+	return nil
+}
 
 func runSet(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("set", flag.ContinueOnError)
@@ -21,6 +32,8 @@ func runSet(args []string, stdout io.Writer) error {
 	passagesFile := fs.String("passages-file", "", "Passages mode passages file.")
 	showHint := fs.String("show-hint", "", `Hint visibility: on|off|yes|no|true|false|1|0 (omit = unchanged).`)
 	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc).`)
+	var quoteToggles quoteSourceFlagList
+	fs.Var(&quoteToggles, "quote-source", "Remote quote API: ID=on|off (repeat). IDs: "+strings.Join(text.KnownQuoteRemoteIDs(), ", ")+".")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printSetHelp(stdout)
@@ -57,8 +70,8 @@ func runSet(args []string, stdout io.Writer) error {
 		}
 		inputPlacement = &p
 	}
-	if wf == "" && pf == "" && showHintPtr == nil && inputPlacement == nil {
-		return errors.New("set requires --words-file, --passages-file, --show-hint, and/or --input-position")
+	if wf == "" && pf == "" && showHintPtr == nil && inputPlacement == nil && len(quoteToggles) == 0 {
+		return errors.New("set requires --words-file, --passages-file, --show-hint, --input-position, and/or --quote-source")
 	}
 
 	validateFile := func(label, path string) (string, error) {
@@ -105,6 +118,16 @@ func runSet(args []string, stdout io.Writer) error {
 	if inputPlacement != nil {
 		settings.InputPosition = inputPlacement.CanonicalString()
 	}
+	for _, pair := range quoteToggles {
+		id, on, err := parseQuoteSourceToggle(pair)
+		if err != nil {
+			return fmt.Errorf("set: %w", err)
+		}
+		if settings.QuoteRemoteEnabled == nil {
+			settings.QuoteRemoteEnabled = map[string]bool{}
+		}
+		settings.QuoteRemoteEnabled[id] = on
+	}
 
 	if err := settingsStore.Save(settings); err != nil {
 		return err
@@ -126,5 +149,38 @@ func runSet(args []string, stdout io.Writer) error {
 	if inputPlacement != nil {
 		fmt.Fprintf(stdout, "Input position: %s\n", settings.InputPosition)
 	}
+	if len(quoteToggles) > 0 {
+		var parts []string
+		for _, id := range text.KnownQuoteRemoteIDs() {
+			state := "on"
+			if !settings.QuoteRemoteIsEnabled(id) {
+				state = "off"
+			}
+			parts = append(parts, id+"="+state)
+		}
+		fmt.Fprintf(stdout, "Remote quote APIs: %s\n", strings.Join(parts, " "))
+	}
 	return nil
+}
+
+func parseQuoteSourceToggle(s string) (id string, on bool, err error) {
+	s = strings.TrimSpace(s)
+	idx := strings.IndexByte(s, '=')
+	if idx <= 0 || idx == len(s)-1 {
+		return "", false, fmt.Errorf("--quote-source expects ID=on|off, got %q", s)
+	}
+	id = strings.ToLower(strings.TrimSpace(s[:idx]))
+	val := strings.ToLower(strings.TrimSpace(s[idx+1:]))
+	switch val {
+	case "on", "true", "1", "yes":
+		on = true
+	case "off", "false", "0", "no":
+		on = false
+	default:
+		return "", false, fmt.Errorf("--quote-source value must be on|off, got %q", val)
+	}
+	if !text.IsKnownQuoteRemoteID(id) {
+		return "", false, fmt.Errorf("unknown quote remote ID %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
+	}
+	return id, on, nil
 }

@@ -13,6 +13,24 @@ import (
 
 const testCacheFilename = "quotes_cache.json"
 
+func quoteCfgTypeFitOnly(url string) QuoteProviderConfig {
+	return QuoteProviderConfig{
+		EnabledRemoteIDs: []string{QuoteRemoteIDTypefit},
+		URLs: map[string]string{
+			QuoteRemoteIDTypefit: url,
+		},
+	}
+}
+
+func quoteCfgZenThenFit(zenURL, fitURL string) QuoteProviderConfig {
+	return QuoteProviderConfig{
+		URLs: map[string]string{
+			QuoteRemoteIDZenquotes: zenURL,
+			QuoteRemoteIDTypefit:   fitURL,
+		},
+	}
+}
+
 func TestQuoteProviderRemoteThenCache(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`[{"text":"Quote one","author":"Author A"},{"text":"Quote one","author":"Author A"},{"text":"Quote two","author":"Author B"}]`))
@@ -20,7 +38,7 @@ func TestQuoteProviderRemoteThenCache(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, srv.URL, srv.Client())
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -28,6 +46,9 @@ func TestQuoteProviderRemoteThenCache(t *testing.T) {
 	}
 	if prompt.Content == "" {
 		t.Fatalf("expected quote content")
+	}
+	if prompt.Source != quoteSourceTypeFit {
+		t.Fatalf("source = %q, want type.fit", prompt.Source)
 	}
 
 	stored, err := cache.Load()
@@ -54,7 +75,7 @@ func TestQuoteProviderRemoteFallbackToCache(t *testing.T) {
 		t.Fatalf("seed cache: %v", err)
 	}
 
-	p := NewQuoteProviderForTesting(cache, srv.URL, srv.Client())
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("expected fallback to cache, got error: %v", err)
@@ -70,8 +91,6 @@ func TestSanitizeQuoteField(t *testing.T) {
 		in   string
 		want string
 	}{
-		// ESC itself is stripped; the remaining "[31m" renders as literal text
-		// without the lead-in, which is the whole point of defanging.
 		{"strips escape sequences", "hello\x1b[31mRED\x1b[0mworld", "hello[31mRED[0mworld"},
 		{"strips OSC bell", "safe\x07text", "safetext"},
 		{"strips NUL and DEL", "a\x00b\x7fc", "abc"},
@@ -104,7 +123,7 @@ func TestQuoteProviderRemote_SanitizesContent(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, srv.URL, srv.Client())
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -130,9 +149,6 @@ func TestQuoteProviderRemote_SanitizesContent(t *testing.T) {
 }
 
 func TestQuoteProviderRemote_LimitsBodySize(t *testing.T) {
-	// Serve a body larger than maxRemoteBodyBytes. The response will be
-	// truncated mid-stream, producing invalid JSON; we fall back to the
-	// embedded seed corpus instead of OOMing.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`[{"text":"`))
@@ -146,7 +162,7 @@ func TestQuoteProviderRemote_LimitsBodySize(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, srv.URL, srv.Client())
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("expected fallback to seed, got error: %v", err)
@@ -163,7 +179,7 @@ func TestQuoteProviderRemoteFallbackToSeed(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, srv.URL, srv.Client())
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -176,7 +192,7 @@ func TestQuoteProviderRemoteFallbackToSeed(t *testing.T) {
 
 func TestQuoteProviderEmptySourceDefaultsToSeed(t *testing.T) {
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, "", nil)
+	p := NewQuoteProviderForTesting(cache, QuoteProviderConfig{}, nil)
 
 	prompt, err := p.Next(context.Background(), Constraints{})
 	if err != nil {
@@ -184,5 +200,131 @@ func TestQuoteProviderEmptySourceDefaultsToSeed(t *testing.T) {
 	}
 	if prompt.Source != quoteSourceSeed {
 		t.Fatalf("expected seed source by default, got %q", prompt.Source)
+	}
+}
+
+func TestQuoteProviderZenQuotesJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"q":"Hello","a":"World"}]`))
+	}))
+	defer srv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cfg := QuoteProviderConfig{
+		EnabledRemoteIDs: []string{QuoteRemoteIDZenquotes},
+		URLs: map[string]string{
+			QuoteRemoteIDZenquotes: srv.URL,
+		},
+	}
+	p := NewQuoteProviderForTesting(cache, cfg, srv.Client())
+	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if prompt.Content != "Hello" || prompt.Author != "World" {
+		t.Fatalf("prompt = %#v", prompt)
+	}
+	if prompt.Source != quoteSourceZenQuotes {
+		t.Fatalf("source = %q, want zenquotes", prompt.Source)
+	}
+}
+
+func TestQuoteProviderSkipsZenQuotesWhenDisabled(t *testing.T) {
+	fitSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"text":"From fit","author":"A"}]`))
+	}))
+	defer fitSrv.Close()
+
+	badZen := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "fail", http.StatusInternalServerError)
+	}))
+	defer badZen.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cfg := QuoteProviderConfig{
+		EnabledRemoteIDs: []string{QuoteRemoteIDTypefit},
+		URLs: map[string]string{
+			QuoteRemoteIDZenquotes: badZen.URL,
+			QuoteRemoteIDTypefit:   fitSrv.URL,
+		},
+	}
+	p := NewQuoteProviderForTesting(cache, cfg, fitSrv.Client())
+	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if prompt.Source != quoteSourceTypeFit {
+		t.Fatalf("want type.fit, got %q", prompt.Source)
+	}
+	if prompt.Content != "From fit" {
+		t.Fatalf("content = %q", prompt.Content)
+	}
+}
+
+func TestQuoteProviderLegacySourceAutoAlias(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"text":"Legacy","author":"X"}]`))
+	}))
+	defer srv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	prompt, err := p.Next(context.Background(), Constraints{Source: "auto"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if prompt.Content != "Legacy" {
+		t.Fatalf("legacy auto alias should behave like remote, got %#v", prompt)
+	}
+}
+
+func TestQuoteProviderFallbackZenToFit(t *testing.T) {
+	badZen := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`not json`))
+	}))
+	defer badZen.Close()
+
+	fitSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"text":"Second","author":"B"}]`))
+	}))
+	defer fitSrv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cfg := quoteCfgZenThenFit(badZen.URL, fitSrv.URL)
+	p := NewQuoteProviderForTesting(cache, cfg, fitSrv.Client())
+	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if prompt.Source != quoteSourceTypeFit {
+		t.Fatalf("want type.fit after zen fails, got %q", prompt.Source)
+	}
+	if prompt.Content != "Second" {
+		t.Fatalf("content = %q", prompt.Content)
+	}
+}
+
+func TestQuoteProviderEmptyEnabledRemoteIDsSkipsHTTP(t *testing.T) {
+	hit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		_, _ = w.Write([]byte(`[{"q":"nope","a":"x"}]`))
+	}))
+	defer srv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cfg := QuoteProviderConfig{
+		EnabledRemoteIDs: []string{},
+		URLs: map[string]string{
+			QuoteRemoteIDZenquotes: srv.URL,
+		},
+	}
+	p := NewQuoteProviderForTesting(cache, cfg, srv.Client())
+	_, err := p.Next(context.Background(), Constraints{Source: "remote"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if hit {
+		t.Fatal("remote HTTP should not run when EnabledRemoteIDs is empty")
 	}
 }

@@ -36,7 +36,8 @@ func CanonicalMode(mode string) (string, error) {
 }
 
 // NewProvider expects a canonical mode (as returned by CanonicalMode).
-func NewProvider(mode string, cache *storage.QuoteCacheStore, wordsFile, passagesFile string) (Provider, error) {
+// quoteCfg is used only for quotes mode (remote API selection and URL overrides).
+func NewProvider(mode string, cache *storage.QuoteCacheStore, wordsFile, passagesFile string, quoteCfg QuoteProviderConfig) (Provider, error) {
 	switch mode {
 	case model.ModePassage:
 		return NewLocalProvider(passagesFile)
@@ -46,7 +47,7 @@ func NewProvider(mode string, cache *storage.QuoteCacheStore, wordsFile, passage
 		if cache == nil {
 			return nil, errors.New("quotes mode requires cache store")
 		}
-		return NewQuoteProvider(cache), nil
+		return NewQuoteProvider(cache, quoteCfg), nil
 	default:
 		return nil, fmt.Errorf("unsupported mode %q (valid: passage, words, quote)", mode)
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand/v2"
 	"net/http"
 	"strings"
@@ -16,14 +15,14 @@ import (
 	"typer/internal/storage"
 )
 
-const typeFitURL = "https://type.fit/api/quotes"
 const defaultRemoteQuoteLimit = 250
+
+// Session source modes (Constraints.Source / --source): where the provider looks first.
+// "remote" tries the enabled remote chain, then cache, then seed; "cache" and "seed" are stricter.
 const (
-	quoteSourceAuto    = "auto"
-	quoteSourceRemote  = "remote"
-	quoteSourceCache   = "cache"
-	quoteSourceSeed    = "seed"
-	quoteSourceTypeFit = "type.fit"
+	quoteSourceRemote = "remote"
+	quoteSourceCache  = "cache"
+	quoteSourceSeed   = "seed"
 )
 
 // maxRemoteBodyBytes caps the response body from the third-party quote API so a
@@ -35,27 +34,38 @@ const maxRemoteBodyBytes = 2 << 20 // 2 MiB
 // poisoned upstream.
 const maxQuoteRuneLen = 1024
 
-type QuoteProvider struct {
-	cache    *storage.QuoteCacheStore
-	http     *http.Client
-	endpoint string
+// QuoteProviderConfig configures which remote APIs to call and optional URL overrides (tests).
+type QuoteProviderConfig struct {
+	// EnabledRemoteIDs is the ordered list of registry IDs to try. Nil means all known remotes
+	// in chain order; an empty non-nil slice means no remotes (e.g. all toggled off in settings).
+	EnabledRemoteIDs []string
+	// URLs maps registry ID (QuoteRemoteID*) to a full URL override; empty string uses provider default.
+	URLs map[string]string
 }
 
-func NewQuoteProvider(cache *storage.QuoteCacheStore) *QuoteProvider {
+type QuoteProvider struct {
+	cache *storage.QuoteCacheStore
+	http  *http.Client
+	cfg   QuoteProviderConfig
+}
+
+// NewQuoteProvider builds the default quote provider: all remotes enabled, production URLs.
+func NewQuoteProvider(cache *storage.QuoteCacheStore, cfg QuoteProviderConfig) *QuoteProvider {
+	if cfg.URLs == nil {
+		cfg.URLs = map[string]string{}
+	}
 	return &QuoteProvider{
-		cache:    cache,
-		endpoint: typeFitURL,
+		cache: cache,
+		cfg:   cfg,
 		http: &http.Client{
 			Timeout: 4 * time.Second,
 		},
 	}
 }
 
-func NewQuoteProviderForTesting(cache *storage.QuoteCacheStore, endpoint string, client *http.Client) *QuoteProvider {
-	p := NewQuoteProvider(cache)
-	if strings.TrimSpace(endpoint) != "" {
-		p.endpoint = endpoint
-	}
+// NewQuoteProviderForTesting uses cfg plus an optional HTTP client (defaults to http.DefaultClient if nil).
+func NewQuoteProviderForTesting(cache *storage.QuoteCacheStore, cfg QuoteProviderConfig, client *http.Client) *QuoteProvider {
+	p := NewQuoteProvider(cache, cfg)
 	if client != nil {
 		p.http = client
 	}
@@ -94,18 +104,20 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 }
 
 func (p *QuoteProvider) loadQuotes(ctx context.Context, source string) ([]storage.CachedQuote, error) {
+	if source == "auto" {
+		source = quoteSourceRemote // legacy alias from older sessions / CLI
+	}
 	switch source {
 	case quoteSourceSeed:
 		return p.seedQuotes()
 	case quoteSourceCache:
 		return p.cacheThenSeed()
-	case quoteSourceRemote, quoteSourceAuto:
+	case quoteSourceRemote:
 		return p.remoteThenCacheThenSeed(ctx)
 	default:
 		return nil, fmt.Errorf(
-			"unsupported quote source %q (valid: %s, %s, %s, %s)",
+			"unsupported quote source %q (valid: %s, %s, %s)",
 			source,
-			quoteSourceAuto,
 			quoteSourceRemote,
 			quoteSourceCache,
 			quoteSourceSeed,
@@ -129,35 +141,43 @@ func (p *QuoteProvider) cacheThenSeed() ([]storage.CachedQuote, error) {
 	return p.seedQuotes()
 }
 
-func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQuote, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.endpoint, nil)
-	if err != nil {
-		return nil, err
+func (p *QuoteProvider) enabledRemoteOrder() []string {
+	if p.cfg.EnabledRemoteIDs != nil {
+		return p.cfg.EnabledRemoteIDs
 	}
-	resp, err := p.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	return KnownQuoteRemoteIDs()
+}
 
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("remote quote API returned status %d", resp.StatusCode)
+func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQuote, error) {
+	ids := p.enabledRemoteOrder()
+	for _, id := range ids {
+		h := handlerByRegistryID(id)
+		if h == nil {
+			continue
+		}
+		url := ""
+		if p.cfg.URLs != nil {
+			url = p.cfg.URLs[id]
+		}
+		raw, err := h.fetch(ctx, p.http, url)
+		if err != nil {
+			continue
+		}
+		quotes := normalizeRemoteQuotes(raw)
+		if len(quotes) == 0 {
+			continue
+		}
+		_ = p.cache.Save(quotes)
+		return quotes, nil
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRemoteBodyBytes))
-	if err != nil {
-		return nil, err
-	}
-	var payload []struct {
-		Text   string `json:"text"`
-		Author string `json:"author"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, err
-	}
-	quotes := make([]storage.CachedQuote, 0, len(payload))
+	return nil, errors.New("remote quote APIs unavailable or returned empty payload")
+}
+
+func normalizeRemoteQuotes(raw []storage.CachedQuote) []storage.CachedQuote {
+	quotes := make([]storage.CachedQuote, 0, len(raw))
 	seen := map[string]struct{}{}
-	for _, item := range payload {
-		content := sanitizeQuoteField(item.Text, maxQuoteRuneLen)
+	for _, item := range raw {
+		content := sanitizeQuoteField(item.Content, maxQuoteRuneLen)
 		if content == "" {
 			continue
 		}
@@ -168,17 +188,13 @@ func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQu
 		quotes = append(quotes, storage.CachedQuote{
 			Content: content,
 			Author:  sanitizeQuoteField(item.Author, maxQuoteRuneLen),
-			Source:  quoteSourceTypeFit,
+			Source:  item.Source,
 		})
 		if len(quotes) >= defaultRemoteQuoteLimit {
 			break
 		}
 	}
-	if len(quotes) == 0 {
-		return nil, errors.New("remote quote API returned empty payload")
-	}
-	_ = p.cache.Save(quotes)
-	return quotes, nil
+	return quotes
 }
 
 func (p *QuoteProvider) seedQuotes() ([]storage.CachedQuote, error) {

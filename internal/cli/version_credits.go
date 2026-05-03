@@ -13,7 +13,7 @@ const creditsMessage = `Data Credits
 - Original corpus source: Google Web Trillion Word Corpus (via LDC), cleaned by Josh Kaufman; subsets by Peter Norvig
 - Passages mode bundled list (assets/passages.txt): Thomas Preston's Dictionary of English Proverbs and Proverbial Phrases (Project Gutenberg #39281)
 - Quotes mode bundled list (assets/quotes.json): curated from dwyl/quotes
-- Optional remote quote API source (when --source=remote): https://type.fit/api/quotes
+- Optional remote quote APIs (when --source=remote): https://zenquotes.io/api/ (primary; free tier requires attribution per https://docs.zenquotes.io/zenquotes-documentation/) and https://type.fit/api/quotes (fallback). Toggle sources with: typer set --quote-source ID=on|off
 
 Libraries
 ---------

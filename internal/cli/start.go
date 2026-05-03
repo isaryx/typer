@@ -26,12 +26,14 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	fs.IntVar(&words, "words", 15, "Words per prompt (words mode).")
 	fs.IntVar(&words, "w", 15, "Shorthand for --words.")
 	var source string
-	fs.StringVar(&source, "source", "seed", "Quotes: auto|remote|cache|seed.")
+	fs.StringVar(&source, "source", "remote", "Quotes: remote|cache|seed.")
+	var quoteSourcesRaw string
+	fs.StringVar(&quoteSourcesRaw, "quote-sources", "", "Quotes only: comma-separated remote IDs for this session (e.g. zenquotes,typefit). Overrides saved toggles.")
 
 	var noGhost bool
 	fs.BoolVar(&noGhost, "no-ghost", false, "Skip ghost overlay from best prior run.")
 	var noInput bool
-	fs.BoolVar(&noInput, "no-input", false, "Hide input line; hint under title only.")
+	fs.BoolVar(&noInput, "no-input", false, "Hide input line.")
 	var noAudible bool
 	fs.BoolVar(&noAudible, "no-audible", false, "Disable terminal bell on mistakes.")
 
@@ -56,13 +58,20 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	}
 
 	sourceProvided := false
+	quoteSourcesProvided := false
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "source" {
+		switch f.Name {
+		case "source":
 			sourceProvided = true
+		case "quote-sources":
+			quoteSourcesProvided = true
 		}
 	})
 	if sourceProvided && canonMode != model.ModeQuote {
 		return fmt.Errorf("--source is only valid with --mode quotes")
+	}
+	if quoteSourcesProvided && canonMode != model.ModeQuote {
+		return fmt.Errorf("--quote-sources is only valid with --mode quotes")
 	}
 
 	opts := model.SessionOptions{
@@ -93,7 +102,19 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	}
 	opts.HideHint = !settings.HintVisible()
 	opts.InputPlacement = settings.InputPlacement()
-	provider, err := text.NewProvider(canonMode, cache, settings.WordsFile, settings.PassagesFile)
+
+	var quoteCfg text.QuoteProviderConfig
+	if canonMode == model.ModeQuote {
+		allowlist, err := parseCommaQuoteSources(quoteSourcesRaw)
+		if err != nil {
+			return err
+		}
+		quoteCfg.EnabledRemoteIDs = text.ResolveEnabledQuoteRemotes(settings.QuoteRemoteEnabled, allowlist)
+		opts.RemoteQuoteFetchSplash = text.QuoteModeMayBlockOnNetwork(canonMode, source) &&
+			len(quoteCfg.EnabledRemoteIDs) > 0
+	}
+
+	provider, err := text.NewProvider(canonMode, cache, settings.WordsFile, settings.PassagesFile, quoteCfg)
 	if err != nil {
 		return err
 	}
@@ -198,4 +219,25 @@ func printOneSessionResult(out io.Writer, r model.SessionResult) {
 
 func printMetricsTable(out io.Writer, heading string, gross, net, adjusted, acc, cons float64, errCount int, elapsedMS int64, summary bool) {
 	ui.PrintMetricsTable(out, heading, gross, net, adjusted, acc, cons, errCount, elapsedMS, summary)
+}
+
+// parseCommaQuoteSources splits a comma-separated list of remote registry IDs.
+// Empty input returns (nil, nil) meaning "use settings only" (no session allowlist).
+func parseCommaQuoteSources(s string) ([]string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		id := strings.ToLower(strings.TrimSpace(p))
+		if id == "" {
+			continue
+		}
+		if !text.IsKnownQuoteRemoteID(id) {
+			return nil, fmt.Errorf("unknown quote remote %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }

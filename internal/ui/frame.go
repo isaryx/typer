@@ -41,8 +41,8 @@ func TruncateTopCaption(label string, middleCells int) string {
 
 // RenderRoundedTop draws ╭ + styled caption + horizontal rule + ╮. marginLeft is
 // prepended to the row (e.g. "  " for indented metrics, "" for passage).
-// RenderRoundedTopHalves draws ╭─╮ with leftLabel centered in the left half of the rule and
-// rightLabel centered in the right half (only ─ between segments; no mid junction glyph).
+// RenderRoundedTopHalves draws ╭─╮ with leftLabel left-aligned in the left half of the rule and
+// rightLabel right-aligned in the right half (only ─ between segments; no mid junction glyph).
 // middleCells is the cell count strictly between the corner characters, matching RenderRoundedTop.
 func RenderRoundedTopHalves(marginLeft string, border, caption lipgloss.Style, leftLabel, rightLabel string, middleCells int) string {
 	if middleCells < 4 {
@@ -50,8 +50,8 @@ func RenderRoundedTopHalves(marginLeft string, border, caption lipgloss.Style, l
 	}
 	leftHalf := middleCells / 2
 	rightHalf := middleCells - leftHalf
-	leftSeg := centerCaptionSegment(leftLabel, leftHalf, border, caption)
-	rightSeg := centerCaptionSegment(rightLabel, rightHalf, border, caption)
+	leftSeg := leftCaptionSegment(leftLabel, leftHalf, border, caption)
+	rightSeg := rightCaptionSegment(rightLabel, rightHalf, border, caption)
 	core := lipgloss.JoinHorizontal(lipgloss.Top,
 		border.Render("╭"),
 		leftSeg,
@@ -64,28 +64,53 @@ func RenderRoundedTopHalves(marginLeft string, border, caption lipgloss.Style, l
 	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Render(marginLeft), core)
 }
 
-func centerCaptionSegment(label string, segmentCells int, border, caption lipgloss.Style) string {
+func leftCaptionSegment(label string, segmentCells int, border, caption lipgloss.Style) string {
 	if segmentCells <= 0 {
 		return ""
 	}
-	trunc := TruncateTopCaption(label, segmentCells)
-	core := " " + trunc + " "
-	for lipgloss.Width(core) > segmentCells && len([]rune(trunc)) > 1 {
+	trunc := strings.TrimSpace(label)
+	for {
+		prefix := " " + trunc
+		if lipgloss.Width(caption.Render(prefix)) <= segmentCells || len([]rune(trunc)) == 0 {
+			break
+		}
 		trunc = string([]rune(trunc)[:len([]rune(trunc))-1])
-		core = " " + trunc + " "
 	}
-	if lipgloss.Width(core) > segmentCells {
-		core = ""
-	}
-	rendered := caption.Render(core)
+	prefix := " " + trunc
+	rendered := caption.Render(prefix)
 	w := lipgloss.Width(rendered)
 	dash := segmentCells - w
 	if dash < 0 {
 		dash = 0
 	}
-	ld := dash / 2
-	rd := dash - ld
-	return border.Render(strings.Repeat("─", ld)) + rendered + border.Render(strings.Repeat("─", rd))
+	return rendered + border.Render(strings.Repeat("─", dash))
+}
+
+func rightCaptionSegment(label string, segmentCells int, border, caption lipgloss.Style) string {
+	if segmentCells <= 0 {
+		return ""
+	}
+	// One cell for trailing ─ before ╮, matching bottom caption row (one ─ before ╯).
+	if segmentCells == 1 {
+		return border.Render("─")
+	}
+	inner := segmentCells - 1
+	trunc := strings.TrimSpace(label)
+	for {
+		core := " " + trunc
+		if lipgloss.Width(caption.Render(core)) <= inner || len([]rune(trunc)) == 0 {
+			break
+		}
+		trunc = string([]rune(trunc)[:len([]rune(trunc))-1])
+	}
+	core := " " + trunc
+	rendered := caption.Render(core)
+	w := lipgloss.Width(rendered)
+	dash := inner - w
+	if dash < 0 {
+		dash = 0
+	}
+	return border.Render(strings.Repeat("─", dash)) + rendered + border.Render("─")
 }
 
 func RenderRoundedTop(marginLeft string, border, caption lipgloss.Style, label string, middleCells int) string {

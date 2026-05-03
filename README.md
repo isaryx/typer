@@ -61,4 +61,4 @@ History and settings stay on your device (typical paths include `~/.config/typer
 
 **Session IDs:** [oklog/ulid](https://github.com/oklog/ulid) ([spec](https://github.com/ulid/spec)), Apache-2.0.
 
-**Bundled content:** Words from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages from public-domain proverbs ([details](assets/PASSAGES_CREDITS.md)). Quotes can use [type.fit](https://type.fit/api/quotes) or bundled data.
+**Bundled content:** Words from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english); passages from public-domain proverbs ([details](assets/PASSAGES_CREDITS.md)). For live quotes, the app tries [ZenQuotes](https://zenquotes.io/) first, then [type.fit](https://type.fit/api/quotes), with toggles via `typer set --quote-source` (see `typer credits` for attribution). Bundled `assets/quotes.json` is used when remotes are off or unavailable.

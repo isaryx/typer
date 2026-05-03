@@ -51,7 +51,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "Interactive session. Ghost uses your best prior run of the same text unless --no-ghost.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC]")
+	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC] [--quote-sources IDS]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input] [--no-audible]")
 	fmt.Fprintln(out, "  typer [same flags...]            # omit \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
@@ -60,14 +60,19 @@ func printStartHelp(out io.Writer) {
 		fmt.Fprintln(w, "Options:")
 		fmt.Fprintf(w, "  %s\t%s\n", "-m, --mode string", "passages|p, words|w, quotes|q (default quotes).")
 		fmt.Fprintf(w, "  %s\t%s\n", "-w, --words int", fmt.Sprintf("Words per prompt (words mode), 1..%d (default 15).", model.MaxWordsPerPrompt))
-		fmt.Fprintf(w, "  %s\t%s\n", "--source string", "Quotes only: auto|remote|cache|seed (default seed).")
+		fmt.Fprintf(w, "  %s\t%s\n", "--source string", "Quotes only: remote|cache|seed (default remote).")
+		fmt.Fprintf(w, "  %s\t%s\n", "--quote-sources string", "Quotes only: comma-separated remote IDs this session (zenquotes, typefit); overrides saved toggles.")
 		fmt.Fprintf(w, "  %s\t%s\n", "-s, --strict", "Wrong character does not advance (bare flag).")
 		fmt.Fprintf(w, "  %s\t%s\n", "-i, --indefinite", "Run another session after each finish until Ctrl+C (bare flag).")
 		fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "QWERTY finger diagram for next key (bare flag).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-ghost", "No ghost overlay from history.")
-		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
 	})
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Examples:")
+	fmt.Fprintln(out, "  typer start --quote-sources typefit")
+	fmt.Fprintln(out, "  typer start --quote-sources zenquotes,typefit")
 }
 
 func printSetHelp(out io.Writer) {
@@ -78,6 +83,7 @@ func printSetHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "          [--show-hint on|off] [--input-position PLACE]")
+	fmt.Fprintln(out, "          [--quote-source ID=on|off] ...")
 	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
@@ -88,7 +94,14 @@ func printSetHelp(out io.Writer) {
 		fmt.Fprintln(w, "Session UI:")
 		fmt.Fprintf(w, "  %s\t%s\n", "--show-hint on|off", "Show or hide hint (default on).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--input-position PLACE", "Input row (default top-left): top|bottom + left|center|right, or tl|tc|tr|bl|bc|br.")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Quote Source:")
+		fmt.Fprintf(w, "  %s\t%s\n", "--quote-source ID=on|off", "Enable/disable a remote quote source.")
 	})
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Examples:")
+	fmt.Fprintln(out, "  typer set --quote-source zenquotes=on --quote-source typefit=on")
+	fmt.Fprintln(out, "  typer set --quote-source zenquotes=off --quote-source typefit=on")
 }
 
 func printHistoryHelp(out io.Writer) {
@@ -131,7 +144,7 @@ func printReplayHelp(out io.Writer) {
 		fmt.Fprintf(w, "  %s\t%s\n", "-l, --last", "Newest session.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--nth int", "Nth newest (1 = newest).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--id string", "Session id from typer history.")
-		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line; hint under title only.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
 	})
 }

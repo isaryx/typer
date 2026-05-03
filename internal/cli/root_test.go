@@ -289,8 +289,11 @@ func TestExecuteCredits(t *testing.T) {
 	if !strings.Contains(stdout.String(), "Data Credits") {
 		t.Fatalf("expected credits heading, got %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "zenquotes") {
+		t.Fatalf("expected zenquotes credit in output, got %q", stdout.String())
+	}
 	if !strings.Contains(stdout.String(), "type.fit") {
-		t.Fatalf("expected quote API credit in output, got %q", stdout.String())
+		t.Fatalf("expected type.fit credit in output, got %q", stdout.String())
 	}
 	if !strings.Contains(stdout.String(), "oklog/ulid") {
 		t.Fatalf("expected ULID library credit in output, got %q", stdout.String())
@@ -367,8 +370,8 @@ func TestRunStartHelpShortCircuits(t *testing.T) {
 	if !strings.Contains(stdout.String(), "(default quotes)") {
 		t.Fatalf("expected quotes default in start help, got %q", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "(default seed)") {
-		t.Fatalf("expected seed source default in start help, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "(default remote)") {
+		t.Fatalf("expected remote source default in start help, got %q", stdout.String())
 	}
 }
 
@@ -493,7 +496,7 @@ func TestRunSetRequiresAtLeastOneFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected runSet to fail without flags")
 	}
-	if !strings.Contains(err.Error(), "set requires --words-file, --passages-file, --show-hint, and/or --input-position") {
+	if !strings.Contains(err.Error(), "set requires --words-file, --passages-file, --show-hint, --input-position, and/or --quote-source") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
 }

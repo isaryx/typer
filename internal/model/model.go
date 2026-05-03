@@ -33,6 +33,9 @@ type SessionOptions struct {
 	InputPlacement InputPlacement
 	// NoAudible disables terminal bell on mistakes (default false = bell on).
 	NoAudible bool
+	// RemoteQuoteFetchSplash, when true, shows a loading line while the first prompt loads
+	// (set by typer start for quote mode with --source remote and at least one remote API enabled).
+	RemoteQuoteFetchSplash bool
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
