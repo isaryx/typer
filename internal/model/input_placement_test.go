@@ -18,6 +18,10 @@ func TestParseInputPosition(t *testing.T) {
 		{"on-bottom", InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}},
 		{"ot", InputPlacement{V: InputVerticalOnTopBorder, H: InputHorizontalCenter}},
 		{"ob", InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}},
+		{"on-top-dynamic", InputPlacement{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter}},
+		{"on-bottom-dynamic", InputPlacement{V: InputVerticalOnBottomBorderDynamic, H: InputHorizontalCenter}},
+		{"otd", InputPlacement{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter}},
+		{"obd", InputPlacement{V: InputVerticalOnBottomBorderDynamic, H: InputHorizontalCenter}},
 	}
 	for _, tc := range cases {
 		got, err := ParseInputPosition(tc.in)
@@ -64,6 +68,8 @@ func TestBorderPlacementCanonicalRoundTrip(t *testing.T) {
 	for _, p := range []InputPlacement{
 		{V: InputVerticalOnTopBorder, H: InputHorizontalCenter},
 		{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter},
+		{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter},
+		{V: InputVerticalOnBottomBorderDynamic, H: InputHorizontalCenter},
 	} {
 		canon := p.CanonicalString()
 		got, err := ParseInputPosition(canon)

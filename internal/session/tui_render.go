@@ -186,11 +186,88 @@ func (m *typingSessionModel) borderChromeCenterStyled() string {
 }
 
 func (m *typingSessionModel) inputOnTopBorder() bool {
-	return !m.noInput && !m.isDone() && m.inputPlacement.V == model.InputVerticalOnTopBorder
+	if m.noInput || m.isDone() {
+		return false
+	}
+	switch m.inputPlacement.V {
+	case model.InputVerticalOnTopBorder, model.InputVerticalOnTopBorderDynamic:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *typingSessionModel) inputOnBottomBorder() bool {
-	return !m.noInput && !m.isDone() && m.inputPlacement.V == model.InputVerticalOnBottomBorder
+	if m.noInput || m.isDone() {
+		return false
+	}
+	switch m.inputPlacement.V {
+	case model.InputVerticalOnBottomBorder, model.InputVerticalOnBottomBorderDynamic:
+		return true
+	default:
+		return false
+	}
+}
+
+// activeWordContentOffset returns the active word's start column and width in passage inner coordinates (0..lineWidth-1)
+// when that word's wrapped line is visible in the passage viewport. Otherwise visible is false (caller should fall back to centered border input).
+// lines and firstWordIdx must come from collectWrappedWordLines(lineWidth, m.renderPassageWordSegment).
+func (m *typingSessionModel) activeWordContentOffset(lineWidth int, lines []string, firstWordIdx []int) (wordStart, wordWidth int, visible bool) {
+	if len(m.words) == 0 {
+		return 0, 0, false
+	}
+	activeW := m.wordIndex
+	if activeW >= len(m.words) {
+		activeW = len(m.words) - 1
+	}
+	if len(lines) == 0 {
+		return 0, 0, false
+	}
+	activeLine := lineIndexForWord(firstWordIdx, activeW)
+	start := passageViewportStart(activeLine, len(lines), passageViewportLines)
+	end := start + passageViewportLines
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if activeLine < start || activeLine >= end {
+		return 0, 0, false
+	}
+	lineFirst := firstWordIdx[activeLine]
+	offset := 0
+	for i := lineFirst; i < activeW; i++ {
+		offset += lipgloss.Width(m.renderPassageWordSegment(i, m.words[i]))
+		offset += lipgloss.Width(m.interWordSeparator(i))
+	}
+	ww := lipgloss.Width(m.renderPassageWordSegment(activeW, m.words[activeW]))
+	return offset, ww, true
+}
+
+// borderInputLeftDashes chooses how many ─ cells precede the input segment on the top/bottom border row.
+// When dynamic is true, the segment is shifted so it roughly centers on the active word in the passage body; otherwise centered in the rule.
+func (m *typingSessionModel) borderInputLeftDashes(inner int, centerStyled string, dynamic bool, lineWidth int, lines []string, firstWordIdx []int) int {
+	w := lipgloss.Width(centerStyled)
+	if inner < w {
+		return 0
+	}
+	rem := inner - w
+	centered := rem / 2
+	if !dynamic {
+		return centered
+	}
+	wordStart, wordWidth, ok := m.activeWordContentOffset(lineWidth, lines, firstWordIdx)
+	if !ok {
+		return centered
+	}
+	// Frame rule is two cells wider than passage inner (╭╮ gutters); map content column c to middle coordinate c+1.
+	wordCenter := 1 + wordStart + wordWidth/2
+	left := wordCenter - w/2
+	if left < 0 {
+		left = 0
+	}
+	if left > rem {
+		left = rem
+	}
+	return left
 }
 
 // footerMetaCombinedLabel combines "by Author" and @source for on-top (bottom border halves) and
@@ -229,6 +306,8 @@ func (m *typingSessionModel) relocatedFooterBottomLine(inner int) string {
 func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content string, cx, cy int, ok bool) {
 	tw := m.wrapWidth()
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
+	lineWidth := m.promptInnerWidth()
+	lines, firstWordIdx := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
 
 	wordLbl := m.wordCountTopLabel()
 	onTopIn := m.inputOnTopBorder()
@@ -239,8 +318,10 @@ func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content
 	switch {
 	case onTopIn:
 		cs := m.borderChromeCenterStyled()
-		topLine = ui.RenderRoundedTopCenterBorder("", m.styles.border, cs, inner)
-		cx = ui.CenterBorderCaretX(true, "", m.styles.border, inner, cs, m.borderInsertionPrefix())
+		dynTop := m.inputPlacement.V == model.InputVerticalOnTopBorderDynamic
+		leftD := m.borderInputLeftDashes(inner, cs, dynTop, lineWidth, lines, firstWordIdx)
+		topLine = ui.RenderRoundedTopCenterBorderLeft("", m.styles.border, cs, inner, leftD)
+		cx = ui.CenterBorderCaretXLeft(true, "", m.styles.border, inner, cs, m.borderInsertionPrefix(), leftD)
 		cy = startRow
 		ok = true
 	case onBottomIn:
@@ -259,9 +340,6 @@ func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content
 	default:
 		topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
 	}
-
-	lineWidth := m.promptInnerWidth()
-	lines, firstWordIdx := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
 
 	activeW := m.wordIndex
 	if len(m.words) > 0 && activeW >= len(m.words) {
@@ -288,8 +366,10 @@ func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content
 
 	if onBottomIn {
 		cs := m.borderChromeCenterStyled()
-		b.WriteString(ui.RenderRoundedBottomCenterBorder("", m.styles.border, cs, inner))
-		cx = ui.CenterBorderCaretX(false, "", m.styles.border, inner, cs, m.borderInsertionPrefix())
+		dynBot := m.inputPlacement.V == model.InputVerticalOnBottomBorderDynamic
+		leftD := m.borderInputLeftDashes(inner, cs, dynBot, lineWidth, lines, firstWordIdx)
+		b.WriteString(ui.RenderRoundedBottomCenterBorderLeft("", m.styles.border, cs, inner, leftD))
+		cx = ui.CenterBorderCaretXLeft(false, "", m.styles.border, inner, cs, m.borderInsertionPrefix(), leftD)
 		cy = startRow + 1 + len(visible)
 		ok = true
 		return b.String(), cx, cy, ok

@@ -93,7 +93,7 @@ func printSetHelp(out io.Writer) {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Session UI:")
 		fmt.Fprintf(w, "  %s\t%s\n", "--show-hint on|off", "Show or hide hint (default on).")
-		fmt.Fprintf(w, "  %s\t%s\n", "--input-position PLACE", "Input row (default top-left): top|bottom + left|center|right; shorthand tl|tc|tr|bl|bc|br; border-centered on-top|on-bottom or ot|ob.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--input-position PLACE", "Input row (default top-left): top|bottom + left|center|right; shorthand tl|tc|tr|bl|bc|br; border on-top|on-bottom (ot|ob); dynamic otd|obd (on-top-dynamic|on-bottom-dynamic) shifts the border input horizontally to follow the active word.")
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Quote Source:")
 		fmt.Fprintf(w, "  %s\t%s\n", "--quote-source ID=on|off", "Enable/disable a remote quote source.")

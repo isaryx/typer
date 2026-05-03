@@ -15,6 +15,10 @@ const (
 	InputVerticalOnTopBorder
 	// InputVerticalOnBottomBorder places the typed input centered in the passage frame bottom border (╰─╯).
 	InputVerticalOnBottomBorder
+	// InputVerticalOnTopBorderDynamic is like OnTopBorder but shifts the input segment horizontally to track the active word.
+	InputVerticalOnTopBorderDynamic
+	// InputVerticalOnBottomBorderDynamic is like OnBottomBorder but shifts the input segment horizontally to track the active word.
+	InputVerticalOnBottomBorderDynamic
 )
 
 // Horizontal alignment of the typed input line within the content width.
@@ -28,6 +32,7 @@ const (
 
 // InputPlacement configures where the "> …" input row appears in the typing TUI.
 // The Go zero value is bottom-left (both enums zero); settings omitting input_position use DefaultInputPlacement.
+// Horizontal alignment (H) applies to top/bottom rows inside the layout; border placements (on-top, on-bottom, dynamic variants) ignore H and center the segment in the frame rule.
 type InputPlacement struct {
 	V InputVertical
 	H InputHorizontal
@@ -45,6 +50,10 @@ func (p InputPlacement) CanonicalString() string {
 		return "on-top"
 	case InputVerticalOnBottomBorder:
 		return "on-bottom"
+	case InputVerticalOnTopBorderDynamic:
+		return "on-top-dynamic"
+	case InputVerticalOnBottomBorderDynamic:
+		return "on-bottom-dynamic"
 	}
 	var vert string
 	switch p.V {
@@ -73,11 +82,13 @@ var inputPositionShorthand = map[string]InputPlacement{
 	"bl": {V: InputVerticalBottom, H: InputHorizontalLeft},
 	"bc": {V: InputVerticalBottom, H: InputHorizontalCenter},
 	"br": {V: InputVerticalBottom, H: InputHorizontalRight},
-	"ot": {V: InputVerticalOnTopBorder, H: InputHorizontalCenter},
-	"ob": {V: InputVerticalOnBottomBorder, H: InputHorizontalCenter},
+	"ot":  {V: InputVerticalOnTopBorder, H: InputHorizontalCenter},
+	"ob":  {V: InputVerticalOnBottomBorder, H: InputHorizontalCenter},
+	"otd": {V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter},
+	"obd": {V: InputVerticalOnBottomBorderDynamic, H: InputHorizontalCenter},
 }
 
-// ParseInputPosition parses values like "top-left", "bottom-center", "on-top", or shorthand "tl", "bc", "ot".
+// ParseInputPosition parses values like "top-left", "bottom-center", "on-top", "on-top-dynamic", or shorthand "tl", "bc", "ot", "otd".
 func ParseInputPosition(s string) (InputPlacement, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	if s == "" {
@@ -88,11 +99,13 @@ func ParseInputPosition(s string) (InputPlacement, error) {
 		return InputPlacement{V: InputVerticalOnTopBorder, H: InputHorizontalCenter}, nil
 	case "on-bottom":
 		return InputPlacement{V: InputVerticalOnBottomBorder, H: InputHorizontalCenter}, nil
+	case "on-top-dynamic":
+		return InputPlacement{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter}, nil
+	case "on-bottom-dynamic":
+		return InputPlacement{V: InputVerticalOnBottomBorderDynamic, H: InputHorizontalCenter}, nil
 	}
-	if len(s) == 2 {
-		if p, ok := inputPositionShorthand[s]; ok {
-			return p, nil
-		}
+	if p, ok := inputPositionShorthand[s]; ok {
+		return p, nil
 	}
 	parts := strings.Split(s, "-")
 	if len(parts) != 2 {

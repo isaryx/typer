@@ -13,7 +13,7 @@ type AppSettings struct {
 	PassagesFile string `json:"passages_file,omitempty"`
 	// ShowHint controls the typing hint line. When nil (missing from JSON), the hint is shown.
 	ShowHint *bool `json:"show_hint,omitempty"`
-	// InputPosition is a value like "bottom-left", "top-center", "on-top", or "ob" (omitted or empty → top-left default).
+	// InputPosition is e.g. "bottom-left", "on-top", "on-bottom-dynamic" / "obd" (omitted or empty → top-left default).
 	InputPosition string `json:"input_position,omitempty"`
 	// QuoteRemoteEnabled toggles remote quote APIs by registry ID (e.g. zenquotes, typefit).
 	// Nil or missing key means enabled for that source.

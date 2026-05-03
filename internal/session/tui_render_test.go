@@ -140,6 +140,56 @@ func TestViewQuoteModeSeedDoesNotShowRemoteCaption(t *testing.T) {
 	}
 }
 
+func TestActiveWordContentOffsetNoWords(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "   "},
+		false,
+		func() time.Time { return time.Unix(0, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	m.width = 80
+	_, _, vis := m.activeWordContentOffset(m.promptInnerWidth(), nil, nil)
+	if vis {
+		t.Fatalf("expected visible=false with no words")
+	}
+}
+
+func TestBorderDynamicCaretXMovesWithActiveWord(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "aa bb cc"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{V: model.InputVerticalOnTopBorderDynamic, H: model.InputHorizontalCenter},
+		nil,
+	)
+	m.width = 80
+	_, cxFirst, _, ok := m.renderPassageFrameWithCursor(0)
+	if !ok {
+		t.Fatal("expected border cursor")
+	}
+	m.wordIndex = 2
+	_, cxThird, _, ok2 := m.renderPassageFrameWithCursor(0)
+	if !ok2 {
+		t.Fatal("expected border cursor on third word")
+	}
+	if cxThird == cxFirst {
+		t.Fatalf("dynamic border should shift caret with active word: cxFirst=%d cxThird=%d", cxFirst, cxThird)
+	}
+}
+
 func TestViewQuoteModeTypefitSourceLabel(t *testing.T) {
 	m := newTypingSessionModel(
 		model.Prompt{Content: "a b", Mode: model.ModeQuote, Source: "type.fit"},

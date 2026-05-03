@@ -138,7 +138,23 @@ func RenderRoundedTopCenterBorder(marginLeft string, border lipgloss.Style, cent
 	if rem < 0 {
 		rem = 0
 	}
-	left := rem / 2
+	return RenderRoundedTopCenterBorderLeft(marginLeft, border, centerStyled, middleCells, rem/2)
+}
+
+// RenderRoundedTopCenterBorderLeft draws the same row as RenderRoundedTopCenterBorder but places exactly leftDashes cells of ─ after ╭ (clamped into the slack around centerStyled).
+func RenderRoundedTopCenterBorderLeft(marginLeft string, border lipgloss.Style, centerStyled string, middleCells, leftDashes int) string {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := leftDashes
+	if left < 0 {
+		left = 0
+	}
+	if left > rem {
+		left = rem
+	}
 	right := rem - left
 	core := lipgloss.JoinHorizontal(lipgloss.Top,
 		border.Render("╭"+strings.Repeat("─", left)),
@@ -210,7 +226,23 @@ func RenderRoundedBottomCenterBorder(marginLeft string, border lipgloss.Style, c
 	if rem < 0 {
 		rem = 0
 	}
-	left := rem / 2
+	return RenderRoundedBottomCenterBorderLeft(marginLeft, border, centerStyled, middleCells, rem/2)
+}
+
+// RenderRoundedBottomCenterBorderLeft draws the same row as RenderRoundedBottomCenterBorder but places exactly leftDashes cells of ─ after ╰.
+func RenderRoundedBottomCenterBorderLeft(marginLeft string, border lipgloss.Style, centerStyled string, middleCells, leftDashes int) string {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := leftDashes
+	if left < 0 {
+		left = 0
+	}
+	if left > rem {
+		left = rem
+	}
 	right := rem - left
 	core := lipgloss.JoinHorizontal(lipgloss.Top,
 		border.Render("╰"+strings.Repeat("─", left)),
@@ -232,7 +264,23 @@ func CenterBorderCaretX(topRow bool, marginLeft string, border lipgloss.Style, m
 	if rem < 0 {
 		rem = 0
 	}
-	left := rem / 2
+	return CenterBorderCaretXLeft(topRow, marginLeft, border, middleCells, centerStyled, insertionPrefix, rem/2)
+}
+
+// CenterBorderCaretXLeft matches RenderRoundedTopCenterBorderLeft / RenderRoundedBottomCenterBorderLeft with the same leftDashes.
+func CenterBorderCaretXLeft(topRow bool, marginLeft string, border lipgloss.Style, middleCells int, centerStyled, insertionPrefix string, leftDashes int) int {
+	w := lipgloss.Width(centerStyled)
+	rem := middleCells - w
+	if rem < 0 {
+		rem = 0
+	}
+	left := leftDashes
+	if left < 0 {
+		left = 0
+	}
+	if left > rem {
+		left = rem
+	}
 	corner := "╭"
 	if !topRow {
 		corner = "╰"

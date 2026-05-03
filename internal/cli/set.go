@@ -31,7 +31,7 @@ func runSet(args []string, stdout io.Writer) error {
 	wordsFile := fs.String("words-file", "", "Words mode word list file.")
 	passagesFile := fs.String("passages-file", "", "Passages mode passages file.")
 	showHint := fs.String("show-hint", "", `Hint visibility: on|off|yes|no|true|false|1|0 (omit = unchanged).`)
-	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc, on-top / ot).`)
+	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc, on-top / ot, on-top-dynamic / otd).`)
 	var quoteToggles quoteSourceFlagList
 	fs.Var(&quoteToggles, "quote-source", "Remote quote API: ID=on|off (repeat). IDs: "+strings.Join(text.KnownQuoteRemoteIDs(), ", ")+".")
 	if err := fs.Parse(args); err != nil {

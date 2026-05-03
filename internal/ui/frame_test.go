@@ -55,6 +55,24 @@ func TestCenterBorderCaretXMatchesLayout(t *testing.T) {
 	}
 }
 
+func TestCenterBorderCaretXLeftMatchesLayout(t *testing.T) {
+	border := lipgloss.NewStyle()
+	const middleCells = 40
+	center := border.Render("|") + " hi " + border.Render("|")
+	prefix := border.Render("|") + " hi"
+	const leftDashes = 3
+	x := CenterBorderCaretXLeft(true, "", border, middleCells, center, prefix, leftDashes)
+	line := RenderRoundedTopCenterBorderLeft("", border, center, middleCells, leftDashes)
+	if lipgloss.Width(line) != lipgloss.Width(RenderRoundedTop("", border, lipgloss.NewStyle(), "x", middleCells)) {
+		t.Fatalf("offset top width mismatch")
+	}
+	leftSeg := border.Render("╭" + strings.Repeat("─", leftDashes))
+	wantX := lipgloss.Width(leftSeg) + lipgloss.Width(prefix)
+	if x != wantX {
+		t.Fatalf("CenterBorderCaretXLeft=%d want %d", x, wantX)
+	}
+}
+
 func TestRenderRoundedTopHalvesWidth(t *testing.T) {
 	border := lipgloss.NewStyle()
 	cap := lipgloss.NewStyle()
