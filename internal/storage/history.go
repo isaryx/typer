@@ -13,6 +13,15 @@ import (
 // ErrNoGhostCandidate is returned when no completed session with a typing trace exists for the hash.
 var ErrNoGhostCandidate = errors.New("no session with typing trace for this prompt content")
 
+// ErrSessionNotFound is returned when GetByID finds no matching session.
+var ErrSessionNotFound = errors.New("session not found")
+
+// ErrInsufficientHistory is returned when NthNewest cannot satisfy n (not enough sessions).
+var ErrInsufficientHistory = errors.New("insufficient history")
+
+// ErrNthOutOfRange is returned when NthNewest is called with n < 1.
+var ErrNthOutOfRange = errors.New("nth out of range")
+
 const historyVersion = 1
 
 type HistoryStore struct {
@@ -55,20 +64,20 @@ func (s *HistoryStore) GetByID(id string) (model.SessionResult, error) {
 			return sess, nil
 		}
 	}
-	return model.SessionResult{}, fmt.Errorf("no session with id %q", id)
+	return model.SessionResult{}, fmt.Errorf("no session with id %q: %w", id, ErrSessionNotFound)
 }
 
 // NthNewest returns the n-th newest session (n=1 is most recent), matching the order of history --last.
 func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
 	if n < 1 {
-		return model.SessionResult{}, fmt.Errorf("nth must be >= 1")
+		return model.SessionResult{}, fmt.Errorf("nth must be at least 1: %w", ErrNthOutOfRange)
 	}
 	list, err := s.List(n)
 	if err != nil {
 		return model.SessionResult{}, fmt.Errorf("nth newest session: %w", err)
 	}
 	if len(list) < n {
-		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history", len(list))
+		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history: %w", len(list), ErrInsufficientHistory)
 	}
 	return list[n-1], nil
 }

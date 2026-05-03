@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strings"
 
@@ -45,7 +44,7 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 			return runStart(ctx, args, stdin, stdout)
 		}
 		printHelp(stderr)
-		return fmt.Errorf("unknown command %q", args[0])
+		return usageErrf("unknown command %q", args[0])
 	}
 }
 
@@ -53,5 +52,5 @@ func rejectExtraArgs(command string, extras []string) error {
 	if len(extras) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%s does not take positional arguments: %s", command, strings.Join(extras, " "))
+	return usageErrf("%s does not take positional arguments: %s", command, strings.Join(extras, " "))
 }

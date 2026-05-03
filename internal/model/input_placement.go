@@ -40,7 +40,7 @@ type InputPlacement struct {
 
 // DefaultInputPlacement is used when stored settings leave input_position empty or invalid.
 func DefaultInputPlacement() InputPlacement {
-	return InputPlacement{V: InputVerticalTop, H: InputHorizontalLeft}
+	return InputPlacement{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter}
 }
 
 // CanonicalString returns a stable form for JSON storage and CLI display (e.g. "bottom-left").

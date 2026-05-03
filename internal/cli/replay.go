@@ -40,7 +40,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 			printReplayHelp(stdout)
 			return nil
 		}
-		return err
+		return usageErrf("%v", err)
 	}
 	if err := rejectExtraArgs("replay", fs.Args()); err != nil {
 		return err
@@ -56,7 +56,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	case strings.TrimSpace(*id) != "":
 		useID = strings.TrimSpace(*id)
 	default:
-		return errors.New("replay requires -l/--last, --nth N, or --id ID (see: typer replay -h)")
+		return usageErrf("replay requires -l/--last, --nth N, or --id ID (see: typer replay -h)")
 	}
 
 	store, err := newHistoryStore()
@@ -78,6 +78,9 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 		baseline, err = store.NthNewest(nSelect)
 	}
 	if err != nil {
+		if errors.Is(err, storage.ErrSessionNotFound) || errors.Is(err, storage.ErrInsufficientHistory) || errors.Is(err, storage.ErrNthOutOfRange) {
+			return usageErrf("%v", err)
+		}
 		return err
 	}
 	if len(strings.Fields(baseline.Prompt.Content)) == 0 {

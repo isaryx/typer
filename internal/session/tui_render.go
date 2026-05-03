@@ -164,13 +164,6 @@ func passageViewportStart(activeLine, totalLines, viewportH int) int {
 	return start
 }
 
-func (m *typingSessionModel) renderStyledInputLine() string {
-	if m.inputOnTopBorder() || m.inputOnBottomBorder() {
-		return m.borderChromeCenterStyled()
-	}
-	return m.promptInputStyled()
-}
-
 func (m *typingSessionModel) promptInputStyled() string {
 	return m.styles.promptPrefix.Render("> ") + m.renderInputWord()
 }
@@ -388,11 +381,6 @@ func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content
 	return b.String(), 0, 0, false
 }
 
-func (m *typingSessionModel) renderPassageFrame() string {
-	s, _, _, _ := m.renderPassageFrameWithCursor(0)
-	return s
-}
-
 func (m *typingSessionModel) renderWordPiece(i int, w string) string {
 	switch {
 	case i < m.wordIndex:
@@ -470,7 +458,8 @@ func (m *typingSessionModel) joinLineParts(parts []string, firstWordIndex int) s
 	return b.String()
 }
 
-// renderPassageWordSegment styles one word for passage layout; same logic as renderMergedWords.
+// renderPassageWordSegment styles one word for passage layout; with a shadow trace,
+// each segment is rendered via renderMergedWordPiece.
 func (m *typingSessionModel) renderPassageWordSegment(i int, w string) string {
 	if !m.hasShadowReplay() {
 		return m.renderWordPiece(i, w)
@@ -522,12 +511,6 @@ func (m *typingSessionModel) collectWrappedWordLines(lineWidth int, seg func(int
 
 func (m *typingSessionModel) renderWords(lineWidth int) string {
 	lines, _ := m.collectWrappedWordLines(lineWidth, m.renderWordPiece)
-	return strings.Join(lines, "\n")
-}
-
-// renderMergedWords draws user + ghost on the same passage; without a trace it matches renderWords.
-func (m *typingSessionModel) renderMergedWords(lineWidth int) string {
-	lines, _ := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
 	return strings.Join(lines, "\n")
 }
 

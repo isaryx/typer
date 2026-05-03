@@ -31,7 +31,7 @@ func runSet(args []string, stdout io.Writer) error {
 	wordsFile := fs.String("words-file", "", "Words mode word list file.")
 	passagesFile := fs.String("passages-file", "", "Passages mode passages file.")
 	showHint := fs.String("show-hint", "", `Hint visibility: on|off|yes|no|true|false|1|0 (omit = unchanged).`)
-	inputPosition := fs.String("input-position", "", `Input line placement (e.g. top-left, bc, on-top / ot, on-top-dynamic / otd).`)
+	inputPosition := fs.String("input-position", "", `Input line placement (default otd; e.g. top-left, bc, on-top / ot, on-top-dynamic / otd).`)
 	var quoteToggles quoteSourceFlagList
 	fs.Var(&quoteToggles, "quote-source", "Remote quote API: ID=on|off (repeat). IDs: "+strings.Join(text.KnownQuoteRemoteIDs(), ", ")+".")
 	if err := fs.Parse(args); err != nil {
@@ -39,7 +39,7 @@ func runSet(args []string, stdout io.Writer) error {
 			printSetHelp(stdout)
 			return nil
 		}
-		return err
+		return usageErrf("%v", err)
 	}
 	if err := rejectExtraArgs("set", fs.Args()); err != nil {
 		return err
@@ -59,32 +59,32 @@ func runSet(args []string, stdout io.Writer) error {
 		v := false
 		showHintPtr = &v
 	default:
-		return fmt.Errorf("set: --show-hint must be one of on, off, yes, no, true, false, 1, 0, got %q", strings.TrimSpace(*showHint))
+		return usageErrf("set: --show-hint must be one of on, off, yes, no, true, false, 1, 0, got %q", strings.TrimSpace(*showHint))
 	}
 	inputPosArg := strings.TrimSpace(*inputPosition)
 	var inputPlacement *model.InputPlacement
 	if inputPosArg != "" {
 		p, err := model.ParseInputPosition(inputPosArg)
 		if err != nil {
-			return fmt.Errorf("set: %w", err)
+			return usageErrf("set: %v", err)
 		}
 		inputPlacement = &p
 	}
 	if wf == "" && pf == "" && showHintPtr == nil && inputPlacement == nil && len(quoteToggles) == 0 {
-		return errors.New("set requires --words-file, --passages-file, --show-hint, --input-position, and/or --quote-source")
+		return usageErrf("set requires --words-file, --passages-file, --show-hint, --input-position, and/or --quote-source")
 	}
 
 	validateFile := func(label, path string) (string, error) {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			return "", err
+			return "", usageErrf("invalid %s %q: %v", label, path, err)
 		}
 		info, err := os.Stat(absPath)
 		if err != nil {
-			return "", fmt.Errorf("invalid %s %q: %w", label, absPath, err)
+			return "", usageErrf("invalid %s %q: %v", label, absPath, err)
 		}
 		if info.IsDir() {
-			return "", fmt.Errorf("invalid %s %q: expected file, got directory", label, absPath)
+			return "", usageErrf("invalid %s %q: expected file, got directory", label, absPath)
 		}
 		return absPath, nil
 	}
@@ -121,7 +121,7 @@ func runSet(args []string, stdout io.Writer) error {
 	for _, pair := range quoteToggles {
 		id, on, err := parseQuoteSourceToggle(pair)
 		if err != nil {
-			return fmt.Errorf("set: %w", err)
+			return usageErrf("set: %v", err)
 		}
 		if settings.QuoteRemoteEnabled == nil {
 			settings.QuoteRemoteEnabled = map[string]bool{}
@@ -167,7 +167,7 @@ func parseQuoteSourceToggle(s string) (id string, on bool, err error) {
 	s = strings.TrimSpace(s)
 	idx := strings.IndexByte(s, '=')
 	if idx <= 0 || idx == len(s)-1 {
-		return "", false, fmt.Errorf("--quote-source expects ID=on|off, got %q", s)
+		return "", false, usageErrf("--quote-source expects ID=on|off, got %q", s)
 	}
 	id = strings.ToLower(strings.TrimSpace(s[:idx]))
 	val := strings.ToLower(strings.TrimSpace(s[idx+1:]))
@@ -177,10 +177,10 @@ func parseQuoteSourceToggle(s string) (id string, on bool, err error) {
 	case "off", "false", "0", "no":
 		on = false
 	default:
-		return "", false, fmt.Errorf("--quote-source value must be on|off, got %q", val)
+		return "", false, usageErrf("--quote-source value must be on|off, got %q", val)
 	}
 	if !text.IsKnownQuoteRemoteID(id) {
-		return "", false, fmt.Errorf("unknown quote remote ID %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
+		return "", false, usageErrf("unknown quote remote ID %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
 	}
 	return id, on, nil
 }

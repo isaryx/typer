@@ -67,7 +67,7 @@ func TestSettingsStoreSaveLoadPassagesFile(t *testing.T) {
 
 func TestAppSettingsInputPlacementDefault(t *testing.T) {
 	var a AppSettings
-	if p := a.InputPlacement(); p.CanonicalString() != "top-left" {
+	if p := a.InputPlacement(); p.CanonicalString() != "on-top-dynamic" {
 		t.Fatalf("default InputPlacement: got %q", p.CanonicalString())
 	}
 }

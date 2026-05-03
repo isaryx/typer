@@ -36,11 +36,11 @@ func TestParseInputPosition(t *testing.T) {
 
 func TestDefaultInputPlacement(t *testing.T) {
 	got := DefaultInputPlacement()
-	want := InputPlacement{V: InputVerticalTop, H: InputHorizontalLeft}
+	want := InputPlacement{V: InputVerticalOnTopBorderDynamic, H: InputHorizontalCenter}
 	if got != want {
 		t.Fatalf("DefaultInputPlacement() = %#v, want %#v", got, want)
 	}
-	if got.CanonicalString() != "top-left" {
+	if got.CanonicalString() != "on-top-dynamic" {
 		t.Fatalf("CanonicalString: got %q", got.CanonicalString())
 	}
 }

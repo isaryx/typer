@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -24,13 +23,13 @@ func extractPresenceFlags(args []string) (rest []string, strict, indefinite, fin
 		name, _, foundEq := strings.Cut(a, "=")
 		if foundEq {
 			if _, ok := strictNames[name]; ok {
-				return nil, false, false, false, fmt.Errorf("invalid %s: use --strict or -s for strict mode, or omit for non-strict", a)
+				return nil, false, false, false, usageErrf("invalid %s: use --strict or -s for strict mode, or omit for non-strict", a)
 			}
 			if _, ok := indefNames[name]; ok {
-				return nil, false, false, false, fmt.Errorf("invalid %s: use --indefinite or -i for indefinite mode, or omit", a)
+				return nil, false, false, false, usageErrf("invalid %s: use --indefinite or -i for indefinite mode, or omit", a)
 			}
 			if _, ok := fingerNames[name]; ok {
-				return nil, false, false, false, fmt.Errorf("invalid %s: use --finger-hint or -f, or omit", a)
+				return nil, false, false, false, usageErrf("invalid %s: use --finger-hint or -f, or omit", a)
 			}
 			rest = append(rest, a)
 			continue
@@ -70,7 +69,7 @@ func rejectBoolLiteralAfterPresenceFlag(args []string, i int, flagToken string) 
 		return nil
 	}
 	if _, perr := strconv.ParseBool(next); perr == nil {
-		return fmt.Errorf("invalid: do not pass %q after %s; use the flag alone, or omit", next, flagToken)
+		return usageErrf("invalid: do not pass %q after %s; use the flag alone, or omit", next, flagToken)
 	}
 	return nil
 }

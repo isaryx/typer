@@ -23,13 +23,13 @@ func runHistory(args []string, stdout io.Writer) error {
 			printHistoryHelp(stdout)
 			return nil
 		}
-		return err
+		return usageErrf("%v", err)
 	}
 	if err := rejectExtraArgs("history", fs.Args()); err != nil {
 		return err
 	}
 	if err := model.ValidateHistoryLast(*last); err != nil {
-		return err
+		return usageErrf("%v", err)
 	}
 
 	store, err := storage.NewHistoryStore()
@@ -73,13 +73,13 @@ func runStats(args []string, stdout io.Writer) error {
 			printStatsHelp(stdout)
 			return nil
 		}
-		return err
+		return usageErrf("%v", err)
 	}
 	if err := rejectExtraArgs("stats", fs.Args()); err != nil {
 		return err
 	}
 	if err := model.ValidateHistoryLast(*last); err != nil {
-		return err
+		return usageErrf("%v", err)
 	}
 
 	store, err := storage.NewHistoryStore()

@@ -37,7 +37,7 @@ func parseResetYes(s string) bool {
 
 func runResetProgress(args []string, stdin io.Reader, out, outErr io.Writer) error {
 	if len(args) > 0 {
-		return fmt.Errorf("%s does not take additional arguments", resetProgressFlag)
+		return usageErrf("%s does not take additional arguments", resetProgressFlag)
 	}
 	fmt.Fprint(outErr, "Reset all local session history? [y/N]: ")
 	ok, err := readResetConfirm(stdin)

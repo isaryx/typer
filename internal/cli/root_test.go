@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -309,6 +310,9 @@ func TestExecuteUnknownCommand(t *testing.T) {
 	if !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("expected unknown-command error, got %v", err)
 	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
+	}
 	if !strings.Contains(stderr.String(), "typer") {
 		t.Fatalf("expected help printed to stderr, got %q", stderr.String())
 	}
@@ -323,6 +327,9 @@ func TestRunStartUnknownMode(t *testing.T) {
 	if !strings.Contains(err.Error(), "unsupported mode") {
 		t.Fatalf("expected unsupported-mode error, got %v", err)
 	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
+	}
 }
 
 func TestRunStartSourceRejectedForNonQuoteMode(t *testing.T) {
@@ -333,6 +340,9 @@ func TestRunStartSourceRejectedForNonQuoteMode(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--source is only valid") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 
@@ -345,16 +355,23 @@ func TestRunStartRejectsWordsAboveMax(t *testing.T) {
 	if !strings.Contains(err.Error(), "cannot exceed") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
+	}
 }
 
 func TestRunHistoryRejectsLastOutOfRange(t *testing.T) {
 	var stdout bytes.Buffer
 	if err := runHistory([]string{testFlagLast, "0"}, &stdout); err == nil {
 		t.Fatal("expected error for --last 0")
+	} else if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 	stdout.Reset()
 	if err := runHistory([]string{testFlagLast, strconv.Itoa(model.MaxRetainedHistorySessions + 1)}, &stdout); err == nil {
 		t.Fatal("expected error for --last above max")
+	} else if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 
@@ -383,6 +400,9 @@ func TestRunStartRejectsPositionalArgs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "start does not take positional arguments") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 
@@ -441,6 +461,9 @@ func TestExecuteResetProgressRejectsExtraArgs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "does not take additional arguments") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 
@@ -716,6 +739,9 @@ func TestRunHistoryRejectsPositionalArgs(t *testing.T) {
 	if !strings.Contains(err.Error(), "history does not take positional arguments") {
 		t.Fatalf(unexpectedErrFmt, err)
 	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
+	}
 }
 
 func TestRunReplayRequiresSelector(t *testing.T) {
@@ -726,6 +752,9 @@ func TestRunReplayRequiresSelector(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "replay requires") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 
@@ -828,6 +857,9 @@ func TestRunStatsRejectsPositionalArgs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "stats does not take positional arguments") {
 		t.Fatalf(unexpectedErrFmt, err)
+	}
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("expected ErrUsage, got %v", err)
 	}
 }
 

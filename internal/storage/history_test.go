@@ -218,6 +218,8 @@ func TestHistoryStoreGetByID(t *testing.T) {
 	}
 	if _, err := store.GetByID("missing"); err == nil {
 		t.Fatal("expected error")
+	} else if !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("expected ErrSessionNotFound: %v", err)
 	}
 }
 
@@ -244,6 +246,13 @@ func TestHistoryStoreNthNewest(t *testing.T) {
 	}
 	if _, err := store.NthNewest(10); err == nil {
 		t.Fatal("expected error for out-of-range nth")
+	} else if !errors.Is(err, ErrInsufficientHistory) {
+		t.Fatalf("expected ErrInsufficientHistory: %v", err)
+	}
+	if _, err := store.NthNewest(0); err == nil {
+		t.Fatal("expected error for nth < 1")
+	} else if !errors.Is(err, ErrNthOutOfRange) {
+		t.Fatalf("expected ErrNthOutOfRange: %v", err)
 	}
 }
 

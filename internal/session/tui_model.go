@@ -285,12 +285,6 @@ func caretXAligned(tw int, align lipgloss.Position, rawStyled string) int {
 	}
 }
 
-func (m *typingSessionModel) layoutAlignedInputLine(tw int) string {
-	raw := m.promptInputStyled()
-	align := m.inputAlign()
-	return lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
-}
-
 // typingSessionRunOpts groups TUI flags passed from model.SessionOptions into runTypingSession.
 type typingSessionRunOpts struct {
 	strict         bool

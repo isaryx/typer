@@ -46,7 +46,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 			printStartHelp(stdout)
 			return nil
 		}
-		return err
+		return usageErrf("%v", err)
 	}
 	if err := rejectExtraArgs("start", fs.Args()); err != nil {
 		return err
@@ -54,7 +54,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 
 	canonMode, err := text.CanonicalMode(strings.TrimSpace(mode))
 	if err != nil {
-		return err
+		return usageErrf("%v", err)
 	}
 
 	sourceProvided := false
@@ -68,10 +68,10 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 	})
 	if sourceProvided && canonMode != model.ModeQuote {
-		return fmt.Errorf("--source is only valid with --mode quotes")
+		return usageErrf("--source is only valid with --mode quotes")
 	}
 	if quoteSourcesProvided && canonMode != model.ModeQuote {
-		return fmt.Errorf("--quote-sources is only valid with --mode quotes")
+		return usageErrf("--quote-sources is only valid with --mode quotes")
 	}
 
 	opts := model.SessionOptions{
@@ -85,7 +85,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		NoAudible:  noAudible,
 	}
 	if err := model.ValidateSessionOptions(opts); err != nil {
-		return err
+		return usageErrf("%v", err)
 	}
 
 	cache, err := storage.NewQuoteCacheStore()
@@ -235,7 +235,7 @@ func parseCommaQuoteSources(s string) ([]string, error) {
 			continue
 		}
 		if !text.IsKnownQuoteRemoteID(id) {
-			return nil, fmt.Errorf("unknown quote remote %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
+			return nil, usageErrf("unknown quote remote %q (known: %s)", id, strings.Join(text.KnownQuoteRemoteIDs(), ", "))
 		}
 		out = append(out, id)
 	}
