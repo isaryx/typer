@@ -100,8 +100,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if err != nil {
 		return err
 	}
-	opts.HideHint = !settings.HintVisible()
-	opts.InputPlacement = settings.InputPlacement()
+	applySessionDisplayFromSettings(&opts, settings)
 
 	var quoteCfg text.QuoteProviderConfig
 	if canonMode == model.ModeQuote {
@@ -146,14 +145,9 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		result, err := runner.Run(ctx, opts, stdin, stdout, nil)
+		result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, nil, historyStore)
 		if err != nil {
 			return err
-		}
-		if !result.Aborted {
-			if err := historyStore.Append(result); err != nil {
-				return err
-			}
 		}
 		round++
 		results = append(results, result)

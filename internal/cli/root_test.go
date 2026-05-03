@@ -425,7 +425,7 @@ func TestRunStartHelpShortCircuits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runStart -h: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "Interactive session") {
+	if !strings.Contains(stdout.String(), "Training session") {
 		t.Fatalf("expected start help, got %q", stdout.String())
 	}
 	if !strings.Contains(stdout.String(), "(default quotes)") {

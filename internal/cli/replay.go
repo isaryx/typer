@@ -95,18 +95,15 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	opts := model.SessionOptionsForReplay(baseline)
 	opts.NoInput = noInput
 	opts.NoAudible = noAudible
-	opts.HideHint = !settings.HintVisible()
-	opts.InputPlacement = settings.InputPlacement()
-	result, err := runner.Run(ctx, opts, stdin, stdout, &baseline)
+	applySessionDisplayFromSettings(&opts, settings)
+
+	result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, &baseline, store)
 	if err != nil {
 		return err
 	}
 	if result.Aborted {
 		fmt.Fprintln(stdout, "\nReplay aborted.")
 		return nil
-	}
-	if err := store.Append(result); err != nil {
-		return err
 	}
 	printStartResults(stdout, []model.SessionResult{result})
 	printReplayComparison(stdout, baseline, result)
