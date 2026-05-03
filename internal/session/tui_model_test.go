@@ -608,13 +608,18 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
+	m.width = 80
 	m.wordIndex = 1
 	m.current = "w"
 	m.shadowWordIndex = 0
 	m.shadowCurrent = "hell"
 	s := m.renderMergedWordPiece(0, "hello")
-	if !strings.Contains(s, markGhostCaret) {
-		t.Fatalf("expected ghost mark on prior word: %q", s)
+	if strings.Contains(s, "|") {
+		t.Fatalf("ghost caret is the terminal cursor, not an inline pipe: %q", s)
+	}
+	lines, idx, _ := m.passageWrappedLayout()
+	if _, _, ok := m.ghostCaretViewCoords(0, lines, idx); !ok {
+		t.Fatal("expected ghost caret coords on passage while shadow types a prior word")
 	}
 }
 
@@ -634,13 +639,101 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 	)
+	m.width = 80
 	m.wordIndex = 0
 	m.current = "hello"
 	m.shadowWordIndex = 0
 	m.shadowCurrent = "he"
 	s := m.renderMergedActiveWord("hello")
-	if !strings.Contains(s, markGhostCaret) {
-		t.Fatalf("expected ghost mark in merged render: %q", s)
+	if strings.Contains(s, "|") {
+		t.Fatalf("ghost caret is the terminal cursor, not an inline pipe: %q", s)
+	}
+	lines, idx, _ := m.passageWrappedLayout()
+	if _, _, ok := m.ghostCaretViewCoords(0, lines, idx); !ok {
+		t.Fatal("expected ghost caret coords on merged active word")
+	}
+}
+
+func TestViewHardwareCursorOnPassageForGhostReplay(t *testing.T) {
+	// No dedicated input row or border chrome (--no-input): the only hardware caret is the ghost on passage.
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
+		false,
+		true, // noInput
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	m.width = 88
+	m.wordIndex = 0
+	m.current = "h"
+	m.shadowWordIndex = 0
+	m.shadowCurrent = "he"
+	v := m.View()
+	if v.Cursor == nil {
+		t.Fatal("expected terminal cursor for ghost position")
+	}
+	if v.Cursor.Shape != tea.CursorBar || v.Cursor.Blink {
+		t.Fatalf("ghost should use a steady bar cursor (no blink): %+v", v.Cursor)
+	}
+}
+
+func TestViewShadowReplayHardwareGhostPlusBlinkBlockOnInputLine(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{}, // bottom row (zero value)
+		nil,
+	)
+	m.width = 88
+	m.wordIndex = 0
+	m.current = "h"
+	m.shadowWordIndex = 0
+	m.shadowCurrent = "he"
+	v := m.View()
+	if v.Cursor == nil || v.Cursor.Blink {
+		t.Fatalf("expected steady ghost bar on passage (single hardware cursor): %+v", v.Cursor)
+	}
+	if !strings.Contains(v.Content, "█") {
+		t.Fatalf("expected blinking full block in input line content, got:\n%s", v.Content)
+	}
+}
+
+func TestViewPlainSessionUsesBlinkBlockNotTerminalCaretOnInput(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: helloWorldPrompt},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{}, // bottom row
+		nil,
+	)
+	m.width = 88
+	m.wordIndex = 0
+	m.current = "he"
+	v := m.View()
+	if v.Cursor != nil {
+		t.Fatalf("expected no hardware cursor without ghost replay: %+v", v.Cursor)
+	}
+	if !strings.Contains(v.Content, "█") {
+		t.Fatalf("expected blinking full block on input row: %q", v.Content)
 	}
 }
 
@@ -714,6 +807,44 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 	}
 	if !strings.Contains(v, inputHint) {
 		t.Fatal("expected hint above input")
+	}
+}
+
+// Best ghost from history (Runner.GhostBaseline → same SessionResult shape) must still drive
+// shadow replay: trace present, non-strict shadow, clock starts with the user’s first key.
+func TestGhostFromHistoryStartsShadowClockAfterFirstKey(t *testing.T) {
+	now := time.Unix(1_000, 0)
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello world"},
+		false,
+		func() time.Time { return now },
+		false,
+		&model.SessionResult{
+			TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "h"}},
+		},
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	if !m.hasShadowReplay() {
+		t.Fatal("ghost baseline should populate shadowTrace from TypingTrace")
+	}
+	if m.shadowStrict {
+		t.Fatal("ghost-from-history overlay must use forgiving shadow (shadowStrict=false)")
+	}
+	if !m.replayClockStart.IsZero() {
+		t.Fatal("shadow replay clock should not start before the user types")
+	}
+	gotModel, cmd := m.Update(tea.KeyPressMsg{Text: "h"})
+	updated := gotModel.(*typingSessionModel)
+	if updated.replayClockStart.IsZero() {
+		t.Fatal("first keystroke should start the shadow replay clock (sync with user session clock)")
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to schedule shadow ticks after the first key")
 	}
 }
 
@@ -846,5 +977,21 @@ func TestViewHidesInputLineWhenSessionComplete(t *testing.T) {
 	v := m.View().Content
 	if strings.Contains(v, "> ") {
 		t.Fatalf("expected no input line when session complete, got:\n%s", v)
+	}
+}
+
+func TestGhostOverlayUsesNonStrictShadow(t *testing.T) {
+	strictReplay := &model.SessionResult{
+		ResultSchema: model.SessionResultSchema,
+		Options:      model.SessionOptionsSnapshot{Strict: true},
+		TypingTrace:  []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}},
+	}
+	ghost := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, false, false, false, false, model.InputPlacement{}, nil)
+	if ghost.shadowStrict {
+		t.Fatal("ghost-from-history overlay should use forgiving shadow (shadowStrict=false)")
+	}
+	replay := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, true, false, false, false, model.InputPlacement{}, nil)
+	if !replay.shadowStrict {
+		t.Fatal("typer replay should honor stored strict mode for shadow replay")
 	}
 }

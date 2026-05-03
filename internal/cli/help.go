@@ -70,6 +70,8 @@ func printStartHelp(out io.Writer) {
 		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
 	})
 	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Environment:")
+	fmt.Fprintln(out, "  TYPER_REDUCE_MOTION  If 1, true, yes, or on: no ANSI blink on the inline input caret (█).")
 	fmt.Fprintln(out, "Examples:")
 	fmt.Fprintln(out, "  typer start --quote-sources typefit")
 	fmt.Fprintln(out, "  typer start --quote-sources zenquotes,typefit")

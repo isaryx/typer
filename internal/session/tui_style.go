@@ -13,7 +13,7 @@ type tuiStyles struct {
 	completed    lipgloss.Style
 	completedBad lipgloss.Style
 	active       lipgloss.Style
-	activePlain  lipgloss.Style // same hue as active word, no underline (caret uses combining mark)
+	activePlain  lipgloss.Style // same hue as active word; caret column adds underline via Copy().Underline(true)
 	activeTyped  lipgloss.Style
 	upcoming     lipgloss.Style
 	input        lipgloss.Style

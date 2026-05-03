@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"typer/internal/model"
+	"typer/internal/ui"
 )
 
 func TestViewQuoteModeSourceRelocatedToBottomWhenInputOnTopBorder(t *testing.T) {
@@ -176,17 +177,97 @@ func TestBorderDynamicCaretXMovesWithActiveWord(t *testing.T) {
 		nil,
 	)
 	m.width = 80
-	_, cxFirst, _, ok := m.renderPassageFrameWithCursor(0)
+	lines, firstWordIdx, _ := m.passageWrappedLayout()
+	_, cxFirst, _, ok := m.renderPassageFrame(0, lines, firstWordIdx)
 	if !ok {
 		t.Fatal("expected border cursor")
 	}
 	m.wordIndex = 2
-	_, cxThird, _, ok2 := m.renderPassageFrameWithCursor(0)
+	lines, firstWordIdx, _ = m.passageWrappedLayout()
+	_, cxThird, _, ok2 := m.renderPassageFrame(0, lines, firstWordIdx)
 	if !ok2 {
 		t.Fatal("expected border cursor on third word")
 	}
 	if cxThird == cxFirst {
 		t.Fatalf("dynamic border should shift caret with active word: cxFirst=%d cxThird=%d", cxFirst, cxThird)
+	}
+}
+
+func TestGhostCaretXAtWordStartMatchesPassageInnerOffset(t *testing.T) {
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hello world"},
+		false,
+		func() time.Time { return time.Unix(100, 0) },
+		false,
+		&model.SessionResult{TypingTrace: []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}},
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	m.width = 80
+	m.shadowWordIndex = 0
+	m.shadowCurrent = ""
+	lines, idx, _ := m.passageWrappedLayout()
+	x, _, ok := m.ghostCaretViewCoords(0, lines, idx)
+	if !ok {
+		t.Fatal("expected ghost in viewport")
+	}
+	if x != ui.PassageSideInnerStartCells {
+		t.Fatalf("ghost caret x=%d want %d (RenderRoundedSide inner start)", x, ui.PassageSideInnerStartCells)
+	}
+}
+
+func TestTypingReduceMotionEnv(t *testing.T) {
+	cases := []struct {
+		env  string
+		want bool
+	}{
+		{"1", true},
+		{"true", true},
+		{"yes", true},
+		{"on", true},
+		{"", false},
+		{"0", false},
+		{"no", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.env, func(t *testing.T) {
+			if tc.env == "" {
+				t.Setenv("TYPER_REDUCE_MOTION", "")
+			} else {
+				t.Setenv("TYPER_REDUCE_MOTION", tc.env)
+			}
+			if got := typingReduceMotion(); got != tc.want {
+				t.Fatalf("TYPER_REDUCE_MOTION=%q: got %v want %v", tc.env, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTypingReduceMotionInlineCaretHasNoBlinkSGR(t *testing.T) {
+	t.Setenv("TYPER_REDUCE_MOTION", "1")
+	m := newTypingSessionModel(
+		model.Prompt{Content: "hi"},
+		false,
+		func() time.Time { return time.Unix(0, 0) },
+		false,
+		nil,
+		false,
+		false,
+		false,
+		false,
+		model.InputPlacement{},
+		nil,
+	)
+	m.wordIndex = 0
+	m.current = "h"
+	s := m.renderBlinkBlockCaret()
+	// Standard slow-blink and rapid-blink SGRs (lipgloss Blink uses one of these).
+	if strings.Contains(s, "\x1b[5m") || strings.Contains(s, "\x1b[6m") {
+		t.Fatalf("reduce-motion caret should not emit blink SGR: %q", s)
 	}
 }
 

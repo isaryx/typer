@@ -13,6 +13,11 @@ func TopMiddleWidth(contentInner int) int {
 	return contentInner + 2
 }
 
+// PassageSideInnerStartCells is the horizontal offset from the left edge of RenderRoundedSide's core
+// (when marginLeft is empty) to the first column of inner text: border pipe plus one space before padding.
+// Anything that maps passage text columns to terminal x must stay aligned with RenderRoundedSide.
+const PassageSideInnerStartCells = 2
+
 // FrameBodyInnerWidth is the padded text width between "│ " and " │" in RenderRoundedSide
 // when the frame's outer width (╭ through ╮ on the top row, │ through │ on body rows) is layoutWidth.
 // Session typing UI uses the same value as promptInnerWidth(wrapWidth).

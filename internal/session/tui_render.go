@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -293,14 +294,24 @@ func (m *typingSessionModel) relocatedFooterBottomLine(inner int) string {
 	return ui.RenderRoundedBottomCaption("", m.styles.border, m.styles.meta, d1, capPlain, 1)
 }
 
-// renderPassageFrameWithCursor renders the passage frame; startRow is the 0-based line index of the
-// frame's top border in the overall view. When ok is true, cx/cy are the terminal caret position for
-// on-top / on-bottom border input.
-func (m *typingSessionModel) renderPassageFrameWithCursor(startRow int) (content string, cx, cy int, ok bool) {
+// passageWrappedLayout runs one soft-wrap pass for the passage body (same lines used for the frame
+// and for ghostCaretViewCoords). Call once per View to avoid duplicate layout work.
+func (m *typingSessionModel) passageWrappedLayout() (lines []string, firstWordIdx []int, lineWidth int) {
+	lineWidth = m.promptInnerWidth()
+	lines, firstWordIdx = m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
+	return lines, firstWordIdx, lineWidth
+}
+
+// renderPassageFrame renders the rounded passage frame. startRow is the 0-based line index of the
+// frame's top border in the overall view. lines and firstWordIdx must come from passageWrappedLayout
+// for the same model state (call collect once per View).
+//
+// When ok is true, cx/cy would be where a border-hosted insertion caret sat before inline █ carets;
+// View ignores them (hardware cursor is only for the ghost). Tests still use these for border layout.
+func (m *typingSessionModel) renderPassageFrame(startRow int, lines []string, firstWordIdx []int) (content string, cx, cy int, ok bool) {
 	tw := m.wrapWidth()
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
 	lineWidth := m.promptInnerWidth()
-	lines, firstWordIdx := m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
 
 	wordLbl := m.wordCountTopLabel()
 	onTopIn := m.inputOnTopBorder()
@@ -431,17 +442,11 @@ func (m *typingSessionModel) interWordSeparator(afterIdx int) string {
 	if !userOnSpace && !ghostOnSpace {
 		return " "
 	}
-	var marks string
+	st := m.styles.upcoming
 	if userOnSpace {
-		marks += markUserCaret
+		st = m.styles.activePlain.Copy().Underline(true)
 	}
-	if ghostOnSpace {
-		marks += markGhostCaret
-	}
-	if userOnSpace {
-		return m.styles.activePlain.Render(" " + marks)
-	}
-	return m.styles.upcoming.Render(" " + marks)
+	return st.Render(" ")
 }
 
 func (m *typingSessionModel) joinLineParts(parts []string, firstWordIndex int) string {
@@ -524,8 +529,8 @@ func (m *typingSessionModel) renderMergedWordPiece(i int, w string) string {
 
 	// User finished word i only when their caret moved on *and* the ghost is not still
 	// typing this word. If i < wordIndex but shadowWordIndex == i, the user committed
-	// ahead of the ghost — we must keep showing the ghost here (otherwise the overline
-	// vanishes until the shadow catches up).
+	// ahead of the ghost — we must keep showing the ghost here (otherwise the ghost
+	// caret highlight vanishes until the shadow catches up).
 	if i < m.wordIndex && m.shadowWordIndex != i {
 		return m.renderWordPiece(i, w)
 	}
@@ -542,36 +547,32 @@ func (m *typingSessionModel) renderMergedWordPiece(i int, w string) string {
 		return m.renderGhostCompletedAt(i, w)
 	}
 	if gAct {
-		return m.renderShadowActiveWord(w, i == len(m.words)-1)
+		return m.renderShadowActiveWord(w)
 	}
 	return m.styles.upcoming.Render(w)
 }
 
-// Both on the same word: only combining marks differ by column; rune styling does not depend on ghost position.
+// Both on the same word: user underline on the target letter; ghost position uses the terminal cursor (see ghostCaretViewCoords).
 func (m *typingSessionModel) renderMergedActiveWord(target string) string {
 	tu := []rune(target)
 	cu := len([]rune(m.current))
-	cg := len([]rune(m.shadowCurrent))
 	if len(tu) == 0 {
 		return m.styles.active.Render(target)
 	}
-	// Do not delegate to renderActiveWord when cu >= len(tu): that path omits the ghost
-	// overline while the user has finished the runes but not yet pressed Space.
 	var b strings.Builder
 	for j := 0; j < len(tu); j++ {
 		ch := string(tu[j])
-		marks := ""
-		if cu < len(tu) && j == cu {
-			marks += markUserCaret
-		}
-		if cg < len(tu) && j == cg {
-			marks += markGhostCaret
-		}
+		userAt := cu < len(tu) && j == cu
+		var st lipgloss.Style
 		if j < cu {
-			b.WriteString(m.styles.activeTyped.Render(ch + marks))
+			st = m.styles.activeTyped
 		} else {
-			b.WriteString(m.styles.activePlain.Render(ch + marks))
+			st = m.styles.activePlain
 		}
+		if userAt {
+			st = st.Copy().Underline(true)
+		}
+		b.WriteString(st.Render(ch))
 	}
 	return b.String()
 }
@@ -597,7 +598,7 @@ func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) st
 		var b strings.Builder
 		b.WriteString(m.styles.activeTyped.Render(string(targetRunes)))
 		if isLastWord {
-			b.WriteString(m.styles.activePlain.Render(" " + markUserCaret))
+			b.WriteString(m.styles.activePlain.Copy().Underline(true).Render(" "))
 		}
 		return b.String()
 	}
@@ -608,18 +609,46 @@ func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) st
 	}
 	for j := cursor; j < len(targetRunes); j++ {
 		ch := string(targetRunes[j])
-		marks := ""
+		st := m.styles.activePlain
 		if j == cursor {
-			marks = markUserCaret
+			st = st.Copy().Underline(true)
 		}
-		b.WriteString(m.styles.activePlain.Render(ch + marks))
+		b.WriteString(st.Render(ch))
 	}
 	return b.String()
+}
+
+func (m *typingSessionModel) renderBlinkBlockCaret() string {
+	st := lipgloss.NewStyle().Foreground(m.inputCursorColor())
+	if !typingReduceMotion() {
+		st = st.Blink(true)
+	}
+	return st.Render("█")
+}
+
+// typingReduceMotion reports whether TYPER_REDUCE_MOTION is set (e.g. 1, true, yes).
+// When true, the inline █ caret does not use ANSI blink (accessibility / vestibular comfort).
+func typingReduceMotion() bool {
+	s := strings.TrimSpace(strings.ToLower(os.Getenv("TYPER_REDUCE_MOTION")))
+	switch s {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // renderInputWord groups consecutive good/bad runes into single styled runs so
 // each render emits one ANSI escape per run instead of per rune.
 func (m *typingSessionModel) renderInputWord() string {
+	body := m.renderInputWordBody()
+	if m.showInputChrome() {
+		return body + m.renderBlinkBlockCaret()
+	}
+	return body
+}
+
+func (m *typingSessionModel) renderInputWordBody() string {
 	if m.wordIndex >= len(m.words) {
 		return m.styles.input.Render(m.current)
 	}
@@ -658,32 +687,62 @@ func (m *typingSessionModel) hasShadowReplay() bool {
 	return len(m.shadowTrace) > 0
 }
 
-// Ghost alone on this word: overline moves with the ghost caret; when the ghost has
-// finished all runes, the caret sits on the following space (see interWordSeparator).
-func (m *typingSessionModel) renderShadowActiveWord(target string, isLastWord bool) string {
-	tu := []rune(target)
+// ghostCaretViewCoords returns the terminal cell (x, y) for the shadow caret on passage text,
+// matching RenderRoundedSide geometry (│ + inner). passStart is the view line index of the passage top border row.
+// lines and firstWordIdx must match passageWrappedLayout for the current frame.
+func (m *typingSessionModel) ghostCaretViewCoords(passStart int, lines []string, firstWordIdx []int) (x, y int, ok bool) {
+	if !m.hasShadowReplay() || len(m.words) == 0 {
+		return 0, 0, false
+	}
+	wi := m.shadowWordIndex
+	if wi < 0 || wi >= len(m.words) {
+		return 0, 0, false
+	}
+	if len(lines) == 0 {
+		return 0, 0, false
+	}
+	ghostLine := lineIndexForWord(firstWordIdx, wi)
+	vpStart := passageViewportStart(ghostLine, len(lines), passageViewportLines)
+	vpEnd := vpStart + passageViewportLines
+	if vpEnd > len(lines) {
+		vpEnd = len(lines)
+	}
+	if ghostLine < vpStart || ghostLine >= vpEnd {
+		return 0, 0, false
+	}
+
+	lineFirst := firstWordIdx[ghostLine]
+	innerX := 0
+	for i := lineFirst; i < wi; i++ {
+		innerX += lipgloss.Width(m.renderPassageWordSegment(i, m.words[i]))
+		innerX += lipgloss.Width(m.interWordSeparator(i))
+	}
+
+	ru := []rune(m.words[wi])
 	cg := len([]rune(m.shadowCurrent))
+	if cg > len(ru) {
+		cg = len(ru)
+	}
+	if cg >= len(ru) {
+		innerX += lipgloss.Width(m.renderPassageWordSegment(wi, m.words[wi]))
+	} else {
+		innerX += lipgloss.Width(string(ru[:cg]))
+	}
+
+	x = ui.PassageSideInnerStartCells + innerX
+	y = passStart + 1 + (ghostLine - vpStart)
+	return x, y, true
+}
+
+// Ghost alone on this word: plain passage styling; ghost caret uses the terminal cursor.
+func (m *typingSessionModel) renderShadowActiveWord(target string) string {
+	tu := []rune(target)
 	if len(tu) == 0 {
 		return m.styles.upcoming.Render(target)
 	}
-	if cg >= len(tu) {
-		var b strings.Builder
-		for j := 0; j < len(tu); j++ {
-			b.WriteString(m.styles.upcoming.Render(string(tu[j])))
-		}
-		if isLastWord {
-			b.WriteString(m.styles.upcoming.Render(" " + markGhostCaret))
-		}
-		return b.String()
-	}
 	var b strings.Builder
 	for j := 0; j < len(tu); j++ {
-		ch := string(tu[j])
-		if j == cg {
-			b.WriteString(m.styles.upcoming.Render(ch + markGhostCaret))
-		} else {
-			b.WriteString(m.styles.upcoming.Render(ch))
-		}
+		b.WriteString(m.styles.upcoming.Render(string(tu[j])))
 	}
 	return b.String()
 }

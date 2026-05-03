@@ -17,12 +17,6 @@ import (
 
 const inputHint = "Hint: type the highlighted word, then Space to advance."
 
-// Caret markers are Unicode combining characters (overlay on the glyph; base letter keeps passage color).
-const (
-	markUserCaret  = "\u0332" // COMBINING UNDERLINE LOW LINE — bar below
-	markGhostCaret = "\u0305" // COMBINING OVERLINE — bar above
-)
-
 type typingSessionResult struct {
 	TypedText         string
 	StartedAt         time.Time
@@ -81,7 +75,12 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 	shadowStrict := false
 	var shadowTrace []model.ReplayEvent
 	if replay != nil {
-		shadowStrict = model.SessionOptionsForReplay(*replay).Strict
+		// Ghost overlay (no replay chrome) should not use strict shadow replay: a prior strict
+		// run can include mistyped keys in TypingTrace; strict shadow would ignore them and
+		// the animation would appear frozen. `typer replay` keeps strict for a faithful shadow.
+		if showReplayUI {
+			shadowStrict = model.SessionOptionsForReplay(*replay).Strict
+		}
 		if len(replay.TypingTrace) > 0 {
 			shadowTrace = append([]model.ReplayEvent(nil), replay.TypingTrace...)
 		}
@@ -162,6 +161,11 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// showInputChrome is true when the "> …" / border input row is painted (mirrors View's showInput).
+func (m *typingSessionModel) showInputChrome() bool {
+	return !m.noInput && !m.isDone()
+}
+
 func (m *typingSessionModel) View() tea.View {
 	if len(m.words) == 0 {
 		return tea.NewView("No text available for this session.\n")
@@ -169,7 +173,6 @@ func (m *typingSessionModel) View() tea.View {
 
 	tw := m.wrapWidth()
 	var b strings.Builder
-	var cur *tea.Cursor
 
 	b.WriteString(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
 	b.WriteString("\n")
@@ -182,24 +185,20 @@ func (m *typingSessionModel) View() tea.View {
 		b.WriteString("\n")
 	}
 	// Hide the input line once the passage is finished (same effect as --no-input for the final paint).
-	showInput := !m.noInput && !m.isDone()
+	showInput := m.showInputChrome()
 	topInput := showInput && m.inputPlacement.V == model.InputVerticalTop
 	bottomInput := showInput && m.inputPlacement.V == model.InputVerticalBottom
 	if topInput {
-		raw := m.promptInputStyled()
 		align := m.inputAlign()
-		line := lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
-		cur = m.inputBarCursor(caretXAligned(tw, align, raw), strings.Count(b.String(), "\n"))
+		line := lipgloss.NewStyle().Width(tw).Align(align).Render(m.promptInputStyled())
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
 
 	passStart := strings.Count(b.String(), "\n")
-	passStr, pcx, pcy, pOk := m.renderPassageFrameWithCursor(passStart)
+	lines, firstWordIdx, _ := m.passageWrappedLayout()
+	passStr, _, _, _ := m.renderPassageFrame(passStart, lines, firstWordIdx)
 	b.WriteString(passStr)
-	if pOk {
-		cur = m.inputBarCursor(pcx, pcy)
-	}
 
 	if m.fingerHint {
 		sf := m.suggestedFinger()
@@ -210,10 +209,8 @@ func (m *typingSessionModel) View() tea.View {
 	}
 	if bottomInput {
 		b.WriteString("\n")
-		raw := m.promptInputStyled()
 		align := m.inputAlign()
-		line := lipgloss.NewStyle().Width(tw).Align(align).Render(raw)
-		cur = m.inputBarCursor(caretXAligned(tw, align, raw), strings.Count(b.String(), "\n"))
+		line := lipgloss.NewStyle().Width(tw).Align(align).Render(m.promptInputStyled())
 		b.WriteString(line)
 	}
 	if m.status != "" {
@@ -225,6 +222,15 @@ func (m *typingSessionModel) View() tea.View {
 		b.WriteString(m.styles.meta.Width(tw).Render("Indefinite mode — Ctrl+C or Esc to stop"))
 	}
 	b.WriteString("\n")
+
+	// User typing caret is a blinking block (█) in the view string. The only hardware cursor is
+	// the ghost bar on the passage when shadow replay is active and the ghost is in view.
+	var cur *tea.Cursor
+	if m.hasShadowReplay() {
+		if gx, gy, gOk := m.ghostCaretViewCoords(passStart, lines, firstWordIdx); gOk {
+			cur = m.ghostBarCursor(gx, gy)
+		}
+	}
 
 	v := tea.NewView(b.String())
 	v.Cursor = cur
@@ -242,12 +248,12 @@ func (m *typingSessionModel) inputAlign() lipgloss.Position {
 	}
 }
 
-// inputBarCursor builds the terminal cursor at (x,y), colored like the typed input (good vs bad).
-func (m *typingSessionModel) inputBarCursor(x, y int) *tea.Cursor {
+// ghostBarCursor is the passage ghost caret: bar shape, steady, always white (not input good/bad tint).
+func (m *typingSessionModel) ghostBarCursor(x, y int) *tea.Cursor {
 	c := tea.NewCursor(x, y)
 	c.Shape = tea.CursorBar
-	c.Blink = true
-	c.Color = m.inputCursorColor()
+	c.Blink = false
+	c.Color = lipgloss.Color(ui.ColorBorderHex)
 	return c
 }
 
@@ -266,23 +272,6 @@ func (m *typingSessionModel) inputCursorColor() color.Color {
 		}
 	}
 	return lipgloss.Color(ui.ColorInputFg)
-}
-
-func caretXAligned(tw int, align lipgloss.Position, rawStyled string) int {
-	w := lipgloss.Width(rawStyled)
-	switch align {
-	case lipgloss.Center:
-		return (tw-w)/2 + w
-	case lipgloss.Right:
-		start := tw - w
-		x := start + w
-		if x >= tw {
-			return tw - 1
-		}
-		return x
-	default:
-		return w
-	}
 }
 
 // typingSessionRunOpts groups TUI flags passed from model.SessionOptions into runTypingSession.
