@@ -444,7 +444,7 @@ func (m *typingSessionModel) interWordSeparator(afterIdx int) string {
 	}
 	st := m.styles.upcoming
 	if userOnSpace {
-		st = m.styles.activePlain.Copy().Underline(true)
+		st = m.styles.activePlain.Underline(true)
 	}
 	return st.Render(" ")
 }
@@ -570,7 +570,7 @@ func (m *typingSessionModel) renderMergedActiveWord(target string) string {
 			st = m.styles.activePlain
 		}
 		if userAt {
-			st = st.Copy().Underline(true)
+			st = st.Underline(true)
 		}
 		b.WriteString(st.Render(ch))
 	}
@@ -598,7 +598,7 @@ func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) st
 		var b strings.Builder
 		b.WriteString(m.styles.activeTyped.Render(string(targetRunes)))
 		if isLastWord {
-			b.WriteString(m.styles.activePlain.Copy().Underline(true).Render(" "))
+			b.WriteString(m.styles.activePlain.Underline(true).Render(" "))
 		}
 		return b.String()
 	}
@@ -611,7 +611,7 @@ func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) st
 		ch := string(targetRunes[j])
 		st := m.styles.activePlain
 		if j == cursor {
-			st = st.Copy().Underline(true)
+			st = st.Underline(true)
 		}
 		b.WriteString(st.Render(ch))
 	}
