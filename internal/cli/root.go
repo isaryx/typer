@@ -31,18 +31,14 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return runCredits(stdout)
 	case "key-press":
 		return runKeyPress(ctx, args[1:], stdin, stdout)
-	case "version", "--version", "-v":
+	case "--version", "-v":
 		return runVersion(stdout)
 	case resetProgressFlag:
 		return runResetProgress(args[1:], stdin, stdout, stderr)
-	case "help", "--help", "-h":
+	case "--help", "-h":
 		printHelp(stdout)
 		return nil
 	default:
-		// Shorthand: `typer -m w -w 5` is the same as `typer start -m w -w 5`.
-		if strings.HasPrefix(args[0], "-") {
-			return runStart(ctx, args, stdin, stdout)
-		}
 		printHelp(stderr)
 		return usageErrf("unknown command %q", args[0])
 	}

@@ -21,53 +21,54 @@ func printHelp(out io.Writer) {
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
 		fmt.Fprintln(w, "Usage:")
 		fmt.Fprintln(w, "  typer <command> [arguments]")
-		fmt.Fprintf(w, "  %s\t%s\n", "typer --reset-progress", "Clear history (confirm y/yes).")
-		fmt.Fprintf(w, "  %s\t%s\n", "typer [flags...]", "Same as typer start when the first arg is a flag.")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Flags:")
+		fmt.Fprintf(w, "  %s\t%s\n", "--help, -h", "Show help.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--version, -v", "Print version.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--reset-progress", "Clear history.")
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Commands:")
 		cmds := []struct {
 			name string
 			desc string
 		}{
-			{"start", "Interactive typing session."},
-			{"set", "Save corpus, hint, input layout (see typer set -h)."},
+			{"start", "Start a training session."},
+			{"set", "Configure settings."},
 			{"history", "List recent sessions."},
-			{"replay", "Replay a saved session; compare metrics."},
-			{"stats", "Stats over recent sessions."},
-			{"credits", "Data sources and libraries."},
-			{"key-press", "Echo keys (demo)."},
-			{"version", "Print version."},
+			{"replay", "Compete against a previous session."},
+			{"stats", "View aggregated statistics."},
+			{"credits", "Show credits."},
+			{"key-press", "Echo key presses."},
 		}
 		for _, c := range cmds {
 			fmt.Fprintf(w, "  %s\t%s\n", c.name, c.desc)
 		}
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Subcommand help:")
-		fmt.Fprintln(w, "  typer <command> -h    Full flags for that command (same as --help).")
+		fmt.Fprintln(w, "  typer <command> --help/-h    Show help for the command.")
 	})
 }
 
 func printStartHelp(out io.Writer) {
-	fmt.Fprintln(out, "Interactive session. Ghost uses your best prior run of the same text unless --no-ghost.")
+	fmt.Fprintln(out, "Training session.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC] [--quote-sources IDS]")
 	fmt.Fprintln(out, "              [--strict|-s] [--indefinite|-i] [--finger-hint|-f] [--no-ghost] [--no-input] [--no-audible]")
-	fmt.Fprintln(out, "  typer [same flags...]            # omit \"start\" when the first argument is a flag")
 	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
-		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "Flags:")
 		fmt.Fprintf(w, "  %s\t%s\n", "-m, --mode string", "passages|p, words|w, quotes|q (default quotes).")
 		fmt.Fprintf(w, "  %s\t%s\n", "-w, --words int", fmt.Sprintf("Words per prompt (words mode), 1..%d (default 15).", model.MaxWordsPerPrompt))
 		fmt.Fprintf(w, "  %s\t%s\n", "--source string", "Quotes only: remote|cache|seed (default remote).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--quote-sources string", "Quotes only: comma-separated remote IDs this session (zenquotes, typefit); overrides saved toggles.")
-		fmt.Fprintf(w, "  %s\t%s\n", "-s, --strict", "Wrong character does not advance (bare flag).")
-		fmt.Fprintf(w, "  %s\t%s\n", "-i, --indefinite", "Run another session after each finish until Ctrl+C (bare flag).")
-		fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "QWERTY finger diagram for next key (bare flag).")
-		fmt.Fprintf(w, "  %s\t%s\n", "--no-ghost", "No ghost overlay from history.")
-		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide input line.")
-		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable terminal bell on mistakes.")
+		fmt.Fprintf(w, "  %s\t%s\n", "-s, --strict", "Wrong character does not advance.")
+		fmt.Fprintf(w, "  %s\t%s\n", "-i, --indefinite", "Run another session after the current one finishes.")
+		fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "Show QWERTY finger diagram for the next key.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-ghost", "No ghost overlay from a previous session.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-input", "Hide the input line.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--no-audible", "Disable the terminal bell on mistakes.")
 	})
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Environment:")
@@ -81,7 +82,7 @@ func printSetHelp(out io.Writer) {
 	fmt.Fprintln(out, "Merge into saved config; omitted flags unchanged. One flag minimum.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  typer set [options]")
+	fmt.Fprintln(out, "  typer set [flags]")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "  typer set [--words-file PATH] [--passages-file PATH]")
 	fmt.Fprintln(out, "          [--show-hint on|off] [--input-position PLACE]")
@@ -114,7 +115,7 @@ func printHistoryHelp(out io.Writer) {
 	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
-		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "Flags:")
 		fmt.Fprintf(w, "  %s\t%s\n", "--last int", fmt.Sprintf("How many to list, 1..%d (default 20).", model.MaxRetainedHistorySessions))
 	})
 }
@@ -127,7 +128,7 @@ func printStatsHelp(out io.Writer) {
 	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
-		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "Flags:")
 		fmt.Fprintf(w, "  %s\t%s\n", "--last int", fmt.Sprintf("How many sessions, 1..%d (default 20).", model.MaxRetainedHistorySessions))
 	})
 }
@@ -142,7 +143,7 @@ func printReplayHelp(out io.Writer) {
 	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
-		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "Flags:")
 		fmt.Fprintf(w, "  %s\t%s\n", "-l, --last", "Newest session.")
 		fmt.Fprintf(w, "  %s\t%s\n", "--nth int", "Nth newest (1 = newest).")
 		fmt.Fprintf(w, "  %s\t%s\n", "--id string", "Session id from typer history.")

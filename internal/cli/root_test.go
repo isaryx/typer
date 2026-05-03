@@ -271,13 +271,57 @@ func TestExecuteNoArgsPrintsHelp(t *testing.T) {
 }
 
 func TestExecuteHelpAliases(t *testing.T) {
-	for _, alias := range []string{"help", "--help", "-h"} {
+	for _, alias := range []string{"--help", "-h"} {
 		var stdout, stderr bytes.Buffer
 		if err := Execute(context.Background(), []string{alias}, strings.NewReader(""), &stdout, &stderr); err != nil {
 			t.Fatalf("Execute %s: %v", alias, err)
 		}
 		if !strings.Contains(stdout.String(), "typer") {
 			t.Fatalf("%s: expected help output, got %q", alias, stdout.String())
+		}
+	}
+}
+
+func TestExecuteVersionAliases(t *testing.T) {
+	for _, alias := range []string{"--version", "-v"} {
+		var stdout, stderr bytes.Buffer
+		if err := Execute(context.Background(), []string{alias}, strings.NewReader(""), &stdout, &stderr); err != nil {
+			t.Fatalf("Execute %s: %v", alias, err)
+		}
+		if !strings.HasPrefix(stdout.String(), "typer ") {
+			t.Fatalf("%s: expected version line, got %q", alias, stdout.String())
+		}
+	}
+}
+
+func TestExecuteRejectsFlagFirstWithoutStart(t *testing.T) {
+	for _, first := range []string{"-m", "--mode", "-w", "--strict"} {
+		var stdout, stderr bytes.Buffer
+		err := Execute(context.Background(), []string{first, "words"}, strings.NewReader(""), &stdout, &stderr)
+		if err == nil {
+			t.Fatalf("Execute %s: expected error", first)
+		}
+		if !strings.Contains(err.Error(), "unknown command") {
+			t.Fatalf("%s: expected unknown command, got %v", first, err)
+		}
+		if !errors.Is(err, ErrUsage) {
+			t.Fatalf("%s: expected ErrUsage, got %v", first, err)
+		}
+	}
+}
+
+func TestExecuteRejectsHelpAndVersionAsCommands(t *testing.T) {
+	for _, cmd := range []string{"help", "version"} {
+		var stdout, stderr bytes.Buffer
+		err := Execute(context.Background(), []string{cmd}, strings.NewReader(""), &stdout, &stderr)
+		if err == nil {
+			t.Fatalf("Execute %s: expected error", cmd)
+		}
+		if !strings.Contains(err.Error(), "unknown command") {
+			t.Fatalf("%s: expected unknown command, got %v", cmd, err)
+		}
+		if !errors.Is(err, ErrUsage) {
+			t.Fatalf("%s: expected ErrUsage, got %v", cmd, err)
 		}
 	}
 }

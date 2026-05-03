@@ -31,7 +31,7 @@ typer start
 typer history
 ```
 
-Run `typer --help` and `typer start --help` for modes, flags, and other commands (`replay`, `set`, etc.). From a clone, use `go run ./cmd/typer` instead of `typer`.
+Run `typer --help` or `typer -h` for commands and global flags; use `typer start --help` or `typer start -h` for session flags (same `--help`/`-h` pattern on other commands). From a clone, use `go run ./cmd/typer` instead of `typer`.
 
 ## Build
 

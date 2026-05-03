@@ -9,7 +9,7 @@ import (
 )
 
 func printKeyPressHelp(out io.Writer) {
-	fmt.Fprintln(out, "Echo keys on screen (last 10 on a second line). Ctrl+C quits.")
+	fmt.Fprintln(out, "Echo key presses on screen (last 10 on a second line). Ctrl+C quits.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer key-press")
