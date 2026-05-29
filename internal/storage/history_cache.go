@@ -12,14 +12,14 @@ type historyCache struct {
 	ghostBest map[string]string // content hash -> session ID
 }
 
-func newHistoryCache(file model.HistoryFile) *historyCache {
+func newHistoryCache(file model.HistoryFile, traces map[string][]model.ReplayEvent) *historyCache {
 	c := &historyCache{
 		file:      file,
 		byID:      make(map[string]int, len(file.Sessions)),
 		byHash:    make(map[string][]int),
 		ghostBest: make(map[string]string),
 	}
-	c.rebuildIndexes(nil)
+	c.rebuildIndexes(traces)
 	return c
 }
 

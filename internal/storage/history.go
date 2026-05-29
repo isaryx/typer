@@ -67,7 +67,7 @@ func (s *HistoryStore) ensureLoaded() error {
 		return err
 	}
 	s.traces = tc
-	s.cache = newHistoryCache(file)
+	s.cache = newHistoryCache(file, tc.file.Traces)
 	s.migrateInlineTraces(s.cache, tc)
 	return nil
 }
@@ -179,7 +179,7 @@ func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {
 }
 
 func (s *HistoryStore) Reset() error {
-	s.cache = newHistoryCache(model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}})
+	s.cache = newHistoryCache(model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}, nil)
 	s.traces = newTracesCache()
 	s.cache.dirty = true
 	s.traces.dirty = true
