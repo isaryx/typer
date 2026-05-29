@@ -27,6 +27,7 @@ Rough map of where things live:
   - `history.json` — session metrics and metadata (typing traces stored separately).
   - `traces.json` — sidecar map of session ID → replay trace events (ghost/replay only).
 - `internal/scoring` — WPM and related metrics.
+- `internal/game` — Game modes (`hangman`, `defense`).
 
 ## Performance
 

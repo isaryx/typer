@@ -5,6 +5,7 @@ Cross-platform typing trainer CLI written in Go.
 ## Features
 
 - Practice in the terminal: **passages**, **words**, or **quotes**
+- Typing games: **hangman** and **defense** (`typer play`)
 - Speed and accuracy stats; sessions saved on your machine
 - History, stats, and replay when you want to compare runs
 - Offline-friendly with bundled text
@@ -28,6 +29,7 @@ brew install typer
 
 ```bash
 typer start
+typer play          
 typer history
 ```
 

@@ -39,7 +39,7 @@ func printHelp(out io.Writer) {
 			{"stats", "View aggregated statistics."},
 			{"credits", "Show credits."},
 			{"key-press", "Echo key presses."},
-			{"play", "Solo typing games (hangman, …)."},
+			{"play", "Typing games."},
 		}
 		for _, c := range cmds {
 			fmt.Fprintf(w, "  %s\t%s\n", c.name, c.desc)
