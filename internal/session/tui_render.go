@@ -542,34 +542,7 @@ func (m *typingSessionModel) renderGhostCompletedAt(_ int, w string) string {
 }
 
 func (m *typingSessionModel) renderActiveWord(target string, isLastWord bool) string {
-	targetRunes := []rune(target)
-	if len(targetRunes) == 0 {
-		return m.styles.active.Render(target)
-	}
-
-	cursor := utf8.RuneCountInString(m.current)
-	if cursor >= len(targetRunes) {
-		var b strings.Builder
-		b.WriteString(m.styles.activeTyped.Render(string(targetRunes)))
-		if isLastWord {
-			b.WriteString(m.styles.activePlain.Underline(true).Render(" "))
-		}
-		return b.String()
-	}
-
-	var b strings.Builder
-	if cursor > 0 {
-		b.WriteString(m.styles.activeTyped.Render(string(targetRunes[:cursor])))
-	}
-	for j := cursor; j < len(targetRunes); j++ {
-		ch := string(targetRunes[j])
-		st := m.styles.activePlain
-		if j == cursor {
-			st = st.Underline(true)
-		}
-		b.WriteString(st.Render(ch))
-	}
-	return b.String()
+	return renderActiveWordWithTyped(m.styles, target, m.current, isLastWord)
 }
 
 func (m *typingSessionModel) renderBlinkBlockCaret() string {

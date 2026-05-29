@@ -41,6 +41,12 @@ func (p *WordsProvider) Name() string {
 	return p.sourceID
 }
 
+func (p *WordsProvider) AllWords() []string {
+	out := make([]string, len(p.words))
+	copy(out, p.words)
+	return out
+}
+
 func (p *WordsProvider) Next(_ context.Context, c Constraints) (model.Prompt, error) {
 	n := c.Words
 	if n <= 0 {
