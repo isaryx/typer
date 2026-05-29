@@ -617,8 +617,7 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 	if strings.Contains(s, "|") {
 		t.Fatalf("ghost caret is the terminal cursor, not an inline pipe: %q", s)
 	}
-	lines, idx, _ := m.passageWrappedLayout()
-	if _, _, ok := m.ghostCaretViewCoords(0, lines, idx); !ok {
+	if _, _, ok := m.ghostCaretForTest(0); !ok {
 		t.Fatal("expected ghost caret coords on passage while shadow types a prior word")
 	}
 }
@@ -648,8 +647,7 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 	if strings.Contains(s, "|") {
 		t.Fatalf("ghost caret is the terminal cursor, not an inline pipe: %q", s)
 	}
-	lines, idx, _ := m.passageWrappedLayout()
-	if _, _, ok := m.ghostCaretViewCoords(0, lines, idx); !ok {
+	if _, _, ok := m.ghostCaretForTest(0); !ok {
 		t.Fatal("expected ghost caret coords on merged active word")
 	}
 }

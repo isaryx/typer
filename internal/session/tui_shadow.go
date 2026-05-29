@@ -33,18 +33,36 @@ func (m *typingSessionModel) applyShadowTick() (tea.Model, tea.Cmd) {
 		}
 		m.shadowTracePos++
 	}
-	var cmd tea.Cmd
-	if m.shadowTracePos < len(m.shadowTrace) {
-		cmd = tea.Tick(16*time.Millisecond, func(time.Time) tea.Msg { return shadowTickMsg{} })
+	return m, m.scheduleShadowTick()
+}
+
+func (m *typingSessionModel) scheduleShadowTick() tea.Cmd {
+	if m.shadowTracePos >= len(m.shadowTrace) {
+		return nil
 	}
-	return m, cmd
+	elapsed := m.now().Sub(m.replayClockStart).Milliseconds()
+	nextAt := m.shadowTrace[m.shadowTracePos].AtMS
+	gap := nextAt - elapsed
+	var delay time.Duration
+	switch {
+	case gap <= 0:
+		delay = 16 * time.Millisecond
+	case gap < 16:
+		delay = time.Duration(gap) * time.Millisecond
+	default:
+		delay = time.Duration(gap) * time.Millisecond
+		if delay > 250*time.Millisecond {
+			delay = 250 * time.Millisecond
+		}
+	}
+	return tea.Tick(delay, func(time.Time) tea.Msg { return shadowTickMsg{} })
 }
 
 func (m *typingSessionModel) applyShadowKey(r rune) {
 	if m.shadowWordIndex >= len(m.words) {
 		return
 	}
-	target := []rune(m.words[m.shadowWordIndex])
+	target := m.wordRunes[m.shadowWordIndex]
 	current := []rune(m.shadowCurrent)
 	pos := len(current)
 	matched := pos < len(target) && r == target[pos]
@@ -52,10 +70,12 @@ func (m *typingSessionModel) applyShadowKey(r rune) {
 		return
 	}
 	m.shadowCurrent = string(append(current, r))
+	m.bumpWordStyle(m.shadowWordIndex)
 }
 
 func (m *typingSessionModel) applyShadowBackspace() {
 	m.shadowCurrent = removeLastRune(m.shadowCurrent)
+	m.bumpWordStyle(m.shadowWordIndex)
 }
 
 func (m *typingSessionModel) applyShadowCommit() {
@@ -70,8 +90,12 @@ func (m *typingSessionModel) applyShadowCommit() {
 	if m.shadowStrict && !matched {
 		return
 	}
+	m.bumpWordStyle(m.shadowWordIndex)
 	m.shadowWordMatches = append(m.shadowWordMatches, matched)
 	m.shadowWords = append(m.shadowWords, m.shadowCurrent)
 	m.shadowWordIndex++
 	m.shadowCurrent = ""
+	if m.shadowWordIndex < len(m.wordStyleGen) {
+		m.bumpWordStyle(m.shadowWordIndex)
+	}
 }

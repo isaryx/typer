@@ -205,40 +205,28 @@ func (m *typingSessionModel) inputOnBottomBorder() bool {
 
 // activeWordContentOffset returns the active word's start column and width in passage inner coordinates (0..lineWidth-1)
 // when that word's wrapped line is visible in the passage viewport. Otherwise visible is false (caller should fall back to centered border input).
-// lines and firstWordIdx must come from collectWrappedWordLines(lineWidth, m.renderPassageWordSegment).
-func (m *typingSessionModel) activeWordContentOffset(lineWidth int, lines []string, firstWordIdx []int) (wordStart, wordWidth int, visible bool) {
-	if len(m.words) == 0 {
+func (m *typingSessionModel) activeWordContentOffset(pl passageLayout, activeW int) (wordStart, wordWidth int, visible bool) {
+	if len(m.words) == 0 || activeW >= len(m.words) {
 		return 0, 0, false
 	}
-	activeW := m.wordIndex
-	if activeW >= len(m.words) {
-		activeW = len(m.words) - 1
-	}
-	if len(lines) == 0 {
+	if pl.lineCount == 0 {
 		return 0, 0, false
 	}
-	activeLine := lineIndexForWord(firstWordIdx, activeW)
-	start := passageViewportStart(activeLine, len(lines), passageViewportLines)
+	activeLine := pl.lineIndexForWord(activeW)
+	start := passageViewportStart(activeLine, pl.lineCount, passageViewportLines)
 	end := start + passageViewportLines
-	if end > len(lines) {
-		end = len(lines)
+	if end > pl.lineCount {
+		end = pl.lineCount
 	}
 	if activeLine < start || activeLine >= end {
 		return 0, 0, false
 	}
-	lineFirst := firstWordIdx[activeLine]
-	offset := 0
-	for i := lineFirst; i < activeW; i++ {
-		offset += lipgloss.Width(m.renderPassageWordSegment(i, m.words[i]))
-		offset += lipgloss.Width(m.interWordSeparator(i))
-	}
-	ww := lipgloss.Width(m.renderPassageWordSegment(activeW, m.words[activeW]))
-	return offset, ww, true
+	return pl.wordCol[activeW], pl.wordPlainWidth[activeW], true
 }
 
 // borderInputLeftDashes chooses how many ─ cells precede the input segment on the top/bottom border row.
 // When dynamic is true, the segment is shifted so it roughly centers on the active word in the passage body; otherwise centered in the rule.
-func (m *typingSessionModel) borderInputLeftDashes(inner int, centerStyled string, dynamic bool, lineWidth int, lines []string, firstWordIdx []int) int {
+func (m *typingSessionModel) borderInputLeftDashes(inner int, centerStyled string, dynamic bool, pl passageLayout, activeW int) int {
 	w := lipgloss.Width(centerStyled)
 	if inner < w {
 		return 0
@@ -248,7 +236,7 @@ func (m *typingSessionModel) borderInputLeftDashes(inner int, centerStyled strin
 	if !dynamic {
 		return centered
 	}
-	wordStart, wordWidth, ok := m.activeWordContentOffset(lineWidth, lines, firstWordIdx)
+	wordStart, wordWidth, ok := m.activeWordContentOffset(pl, activeW)
 	if !ok {
 		return centered
 	}
@@ -296,34 +284,31 @@ func (m *typingSessionModel) relocatedFooterBottomLine(inner int) string {
 
 // passageWrappedLayout runs one soft-wrap pass for the passage body (same lines used for the frame
 // and for ghostCaretViewCoords). Call once per View to avoid duplicate layout work.
-func (m *typingSessionModel) passageWrappedLayout() (lines []string, firstWordIdx []int, lineWidth int) {
-	lineWidth = m.promptInnerWidth()
-	lines, firstWordIdx = m.collectWrappedWordLines(lineWidth, m.renderPassageWordSegment)
-	return lines, firstWordIdx, lineWidth
-}
+// Implemented in tui_layout_cache.go.
 
 // renderPassageFrame renders the rounded passage frame. startRow is the 0-based line index of the
-// frame's top border in the overall view. lines and firstWordIdx must come from passageWrappedLayout
-// for the same model state (call collect once per View).
-//
-// When ok is true, cx/cy would be where a border-hosted insertion caret sat before inline █ carets;
-// View ignores them (hardware cursor is only for the ghost). Tests still use these for border layout.
-func (m *typingSessionModel) renderPassageFrame(startRow int, lines []string, firstWordIdx []int) (content string, cx, cy int, ok bool) {
+// frame's top border in the overall view. visibleLines and firstWordIdx come from styledViewportLines.
+func (m *typingSessionModel) renderPassageFrame(startRow int, pl passageLayout, visibleLines []string, firstWordIdx []int) (content string, cx, cy int, ok bool) {
 	tw := m.wrapWidth()
 	inner := tw - 2 // between ╭ and ╮ (excluding corner runes)
-	lineWidth := m.promptInnerWidth()
+	lineWidth := pl.lineWidth
 
 	wordLbl := m.wordCountTopLabel()
 	onTopIn := m.inputOnTopBorder()
 	onBottomIn := m.inputOnBottomBorder()
 	combinedMeta := m.footerMetaCombinedLabel()
 
+	activeW := m.wordIndex
+	if len(m.words) > 0 && activeW >= len(m.words) {
+		activeW = len(m.words) - 1
+	}
+
 	var topLine string
 	switch {
 	case onTopIn:
 		cs := m.borderChromeCenterStyled()
 		dynTop := m.inputPlacement.V == model.InputVerticalOnTopBorderDynamic
-		leftD := m.borderInputLeftDashes(inner, cs, dynTop, lineWidth, lines, firstWordIdx)
+		leftD := m.borderInputLeftDashes(inner, cs, dynTop, pl, activeW)
 		topLine = ui.RenderRoundedTopCenterBorderLeft("", m.styles.border, cs, inner, leftD)
 		cx = ui.CenterBorderCaretXLeft(true, "", m.styles.border, inner, cs, m.borderInsertionPrefix(), leftD)
 		cy = startRow
@@ -345,17 +330,6 @@ func (m *typingSessionModel) renderPassageFrame(startRow int, lines []string, fi
 		topLine = ui.RenderRoundedTop("", m.styles.border, m.styles.meta, wordLbl, inner)
 	}
 
-	activeW := m.wordIndex
-	if len(m.words) > 0 && activeW >= len(m.words) {
-		activeW = len(m.words) - 1
-	}
-	activeLine := lineIndexForWord(firstWordIdx, activeW)
-	start := passageViewportStart(activeLine, len(lines), passageViewportLines)
-	end := start + passageViewportLines
-	if end > len(lines) {
-		end = len(lines)
-	}
-	visible := lines[start:end]
 	contentW := lineWidth
 
 	author := strings.TrimSpace(formatByCaption(m.prompt.Author))
@@ -363,18 +337,18 @@ func (m *typingSessionModel) renderPassageFrame(startRow int, lines []string, fi
 	var b strings.Builder
 	b.WriteString(topLine)
 	b.WriteString("\n")
-	for _, pl := range visible {
-		b.WriteString(ui.RenderRoundedSide("", m.styles.border, contentW, pl))
+	for _, line := range visibleLines {
+		b.WriteString(ui.RenderRoundedSide("", m.styles.border, contentW, line))
 		b.WriteString("\n")
 	}
 
 	if onBottomIn {
 		cs := m.borderChromeCenterStyled()
 		dynBot := m.inputPlacement.V == model.InputVerticalOnBottomBorderDynamic
-		leftD := m.borderInputLeftDashes(inner, cs, dynBot, lineWidth, lines, firstWordIdx)
+		leftD := m.borderInputLeftDashes(inner, cs, dynBot, pl, activeW)
 		b.WriteString(ui.RenderRoundedBottomCenterBorderLeft("", m.styles.border, cs, inner, leftD))
 		cx = ui.CenterBorderCaretXLeft(false, "", m.styles.border, inner, cs, m.borderInsertionPrefix(), leftD)
-		cy = startRow + 1 + len(visible)
+		cy = startRow + 1 + len(visibleLines)
 		ok = true
 		return b.String(), cx, cy, ok
 	}
@@ -409,11 +383,10 @@ func (m *typingSessionModel) renderWordPiece(i int, w string) string {
 // partialMatchesFullWord is true when the typing lane is still on wordIdx and partial
 // contains every rune of that word (Space not yet applied). Used for both user and ghost.
 func (m *typingSessionModel) partialMatchesFullWord(wordIdx, laneWordIndex int, partial string) bool {
-	if laneWordIndex >= len(m.words) || wordIdx != laneWordIndex {
+	if laneWordIndex >= len(m.words) || wordIdx != laneWordIndex || wordIdx >= len(m.wordLens) {
 		return false
 	}
-	target := m.words[wordIdx]
-	return utf8.RuneCountInString(partial) >= len([]rune(target))
+	return utf8.RuneCountInString(partial) >= m.wordLens[wordIdx]
 }
 
 // activeWordInputComplete is true when the user has typed every rune of the
@@ -472,50 +445,28 @@ func (m *typingSessionModel) renderPassageWordSegment(i int, w string) string {
 	return m.renderMergedWordPiece(i, w)
 }
 
-// collectWrappedWordLines lays out words into soft-wrapped lines. firstWordIdx[k] is the
-// index of the first word on line k.
+// collectWrappedWordLines lays out words into soft-wrapped lines using plain geometry
+// and styled segments. Prefer ensurePlainLayout + styledViewportLines in the View hot path.
 func (m *typingSessionModel) collectWrappedWordLines(lineWidth int, seg func(int, string) string) ([]string, []int) {
-	if lineWidth < 1 {
-		lineWidth = 1
-	}
+	pl := buildPlainLayout(m.words, lineWidth)
 	var lines []string
-	var firstWordIdx []int
-	var parts []string
-	cur := 0
-	lineStartIdx := 0
-
-	for i, w := range m.words {
-		segStr := seg(i, w)
-		sw := lipgloss.Width(segStr)
-		sep := 0
-		if len(parts) > 0 {
-			sep = lipgloss.Width(m.interWordSeparator(i - 1))
+	for li := 0; li < pl.lineCount; li++ {
+		start := pl.firstWordIdx[li]
+		end := pl.lastWordOnLine(li) + 1
+		parts := make([]string, 0, end-start)
+		for i := start; i < end; i++ {
+			parts = append(parts, seg(i, m.words[i]))
 		}
-		if cur+sep+sw > lineWidth && len(parts) > 0 {
-			lines = append(lines, m.joinLineParts(parts, lineStartIdx))
-			firstWordIdx = append(firstWordIdx, lineStartIdx)
-			parts = nil
-			cur = 0
-			sep = 0
-		}
-		if len(parts) == 0 {
-			lineStartIdx = i
-		}
-		if len(parts) > 0 {
-			cur += sep
-		}
-		parts = append(parts, segStr)
-		cur += sw
+		lines = append(lines, m.joinLineParts(parts, start))
 	}
-	if len(parts) > 0 {
-		lines = append(lines, m.joinLineParts(parts, lineStartIdx))
-		firstWordIdx = append(firstWordIdx, lineStartIdx)
-	}
-	return lines, firstWordIdx
+	return lines, pl.firstWordIdx
 }
 
 func (m *typingSessionModel) renderWords(lineWidth int) string {
-	lines, _ := m.collectWrappedWordLines(lineWidth, m.renderWordPiece)
+	m.layoutWidth = 0
+	m.plainLayout = buildPlainLayout(m.words, lineWidth)
+	m.layoutWidth = lineWidth
+	lines, _, _ := m.passageWrappedLayout()
 	return strings.Join(lines, "\n")
 }
 
@@ -689,8 +640,7 @@ func (m *typingSessionModel) hasShadowReplay() bool {
 
 // ghostCaretViewCoords returns the terminal cell (x, y) for the shadow caret on passage text,
 // matching RenderRoundedSide geometry (│ + inner). passStart is the view line index of the passage top border row.
-// lines and firstWordIdx must match passageWrappedLayout for the current frame.
-func (m *typingSessionModel) ghostCaretViewCoords(passStart int, lines []string, firstWordIdx []int) (x, y int, ok bool) {
+func (m *typingSessionModel) ghostCaretViewCoords(passStart int, pl passageLayout, firstWordIdx []int) (x, y int, ok bool) {
 	if !m.hasShadowReplay() || len(m.words) == 0 {
 		return 0, 0, false
 	}
@@ -698,35 +648,28 @@ func (m *typingSessionModel) ghostCaretViewCoords(passStart int, lines []string,
 	if wi < 0 || wi >= len(m.words) {
 		return 0, 0, false
 	}
-	if len(lines) == 0 {
+	if pl.lineCount == 0 {
 		return 0, 0, false
 	}
-	ghostLine := lineIndexForWord(firstWordIdx, wi)
-	vpStart := passageViewportStart(ghostLine, len(lines), passageViewportLines)
+	ghostLine := pl.lineIndexForWord(wi)
+	vpStart := passageViewportStart(ghostLine, pl.lineCount, passageViewportLines)
 	vpEnd := vpStart + passageViewportLines
-	if vpEnd > len(lines) {
-		vpEnd = len(lines)
+	if vpEnd > pl.lineCount {
+		vpEnd = pl.lineCount
 	}
 	if ghostLine < vpStart || ghostLine >= vpEnd {
 		return 0, 0, false
 	}
 
-	lineFirst := firstWordIdx[ghostLine]
-	innerX := 0
-	for i := lineFirst; i < wi; i++ {
-		innerX += lipgloss.Width(m.renderPassageWordSegment(i, m.words[i]))
-		innerX += lipgloss.Width(m.interWordSeparator(i))
-	}
-
-	ru := []rune(m.words[wi])
+	innerX := pl.wordCol[wi]
 	cg := len([]rune(m.shadowCurrent))
-	if cg > len(ru) {
-		cg = len(ru)
+	if cg > m.wordLens[wi] {
+		cg = m.wordLens[wi]
 	}
-	if cg >= len(ru) {
-		innerX += lipgloss.Width(m.renderPassageWordSegment(wi, m.words[wi]))
+	if cg >= m.wordLens[wi] {
+		innerX += pl.wordPlainWidth[wi]
 	} else {
-		innerX += lipgloss.Width(string(ru[:cg]))
+		innerX += plainRunePrefixWidth(m.words[wi], cg)
 	}
 
 	x = ui.PassageSideInnerStartCells + innerX

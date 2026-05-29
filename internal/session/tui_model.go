@@ -67,6 +67,20 @@ type typingSessionModel struct {
 	replayClockStart  time.Time
 	// bellOut receives the terminal bell (ASCII 7) on mistakes; nil disables audible feedback.
 	bellOut io.Writer
+
+	// Plain wrap geometry (rebuilt on terminal width change).
+	plainLayout passageLayout
+	layoutWidth int
+
+	// Per-word styled segment cache (Phase 3).
+	wordStyleGen   []uint64
+	styledAtGen    []uint64
+	styledSegments []string
+
+	// Finger hint frame cache.
+	lastFingerHintKey   rune
+	cachedFingerHands   string
+	hasCachedFingerHands bool
 }
 
 func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer) *typingSessionModel {
@@ -102,7 +116,10 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		shadowStrict:      shadowStrict,
 		shadowWords:       make([]string, 0, n),
 		shadowWordMatches: make([]bool, 0, n),
-		bellOut: bellOut,
+		wordStyleGen:      make([]uint64, n),
+		styledAtGen:       make([]uint64, n),
+		styledSegments:    make([]string, n),
+		bellOut:           bellOut,
 	}
 }
 
@@ -119,6 +136,8 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.width < 20 {
 			m.width = 20
 		}
+		m.invalidatePlainLayout()
+		m.bumpAllWordStyles()
 		return m, nil
 	case tea.PasteMsg:
 		// v2: bracketed paste is a separate message (not KeyPressMsg with long Text).
@@ -173,16 +192,19 @@ func (m *typingSessionModel) View() tea.View {
 
 	tw := m.wrapWidth()
 	var b strings.Builder
-
-	b.WriteString(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
-	b.WriteString("\n")
-	if !m.hideHint {
-		b.WriteString(m.styles.meta.Width(tw).Render(inputHint))
+	viewLines := 0
+	writeViewLine := func(s string) {
+		b.WriteString(s)
 		b.WriteString("\n")
+		viewLines++
+	}
+
+	writeViewLine(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
+	if !m.hideHint {
+		writeViewLine(m.styles.meta.Width(tw).Render(inputHint))
 	}
 	if m.showReplayUI && m.replay != nil {
-		b.WriteString(m.styles.meta.Width(tw).Render(formatReplayCompactLine(m.replay)))
-		b.WriteString("\n")
+		writeViewLine(m.styles.meta.Width(tw).Render(formatReplayCompactLine(m.replay)))
 	}
 	// Hide the input line once the passage is finished (same effect as --no-input for the final paint).
 	showInput := m.showInputChrome()
@@ -191,20 +213,20 @@ func (m *typingSessionModel) View() tea.View {
 	if topInput {
 		align := m.inputAlign()
 		line := lipgloss.NewStyle().Width(tw).Align(align).Render(m.promptInputStyled())
-		b.WriteString(line)
-		b.WriteString("\n")
+		writeViewLine(line)
 	}
 
-	passStart := strings.Count(b.String(), "\n")
-	lines, firstWordIdx, _ := m.passageWrappedLayout()
-	passStr, _, _, _ := m.renderPassageFrame(passStart, lines, firstWordIdx)
+	passStart := viewLines
+	pl := m.ensurePlainLayout()
+	visibleLines, firstWordIdx := m.styledViewportLines(pl)
+	passStr, _, _, _ := m.renderPassageFrame(passStart, pl, visibleLines, firstWordIdx)
 	b.WriteString(passStr)
 
 	if m.fingerHint {
 		sf := m.suggestedFinger()
 		if sf != FingerUnknown {
 			b.WriteString("\n\n")
-			b.WriteString(m.renderFingerHandsFrame(sf))
+			b.WriteString(m.renderFingerHandsFrameCached(sf))
 		}
 	}
 	if bottomInput {
@@ -227,7 +249,7 @@ func (m *typingSessionModel) View() tea.View {
 	// the ghost bar on the passage when shadow replay is active and the ghost is in view.
 	var cur *tea.Cursor
 	if m.hasShadowReplay() {
-		if gx, gy, gOk := m.ghostCaretViewCoords(passStart, lines, firstWordIdx); gOk {
+		if gx, gy, gOk := m.ghostCaretViewCoords(passStart, pl, firstWordIdx); gOk {
 			cur = m.ghostBarCursor(gx, gy)
 		}
 	}

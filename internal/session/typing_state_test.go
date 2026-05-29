@@ -102,3 +102,95 @@ func TestTypingStateApplyCommitWordTable(t *testing.T) {
 		}
 	})
 }
+
+// TestTypingStateSessionCountersGolden walks a multi-word session and locks counter semantics
+// for performance refactors (rune buffer, layout) to preserve.
+func TestTypingStateSessionCountersGolden(t *testing.T) {
+	start := time.Unix(1000, 0)
+	tick := 0
+	clk := func() time.Time {
+		return start.Add(time.Duration(tick) * time.Second)
+	}
+	words := []string{"the", "quick", "brown", "fox"}
+	s := newTypingState(words, false, clk)
+
+	// Word 0: correct
+	tick = 1
+	s.applyRunes([]rune("the"))
+	tick = 2
+	s.applyCommitWord()
+
+	// Word 1: typo then fix — "quik", backspace, "ck"
+	tick = 3
+	s.applyRunes([]rune("quik"))
+	tick = 4
+	s.applyBackspace()
+	tick = 5
+	s.applyRunes([]rune("ck"))
+	tick = 6
+	s.applyCommitWord()
+
+	// Word 2: correct
+	tick = 7
+	s.applyRunes([]rune("brown"))
+	tick = 8
+	s.applyCommitWord()
+
+	// Word 3: partial mismatch committed in non-strict
+	tick = 9
+	s.applyRunes([]rune("fix"))
+	tick = 10
+	s.applyCommitWord()
+
+	if s.totalKeystrokes != 17 {
+		t.Fatalf("totalKeystrokes = %d, want 17", s.totalKeystrokes)
+	}
+	if s.correctKeystrokes != 15 {
+		t.Fatalf("correctKeystrokes = %d, want 15", s.correctKeystrokes)
+	}
+	if s.totalErrors != 1 {
+		t.Fatalf("totalErrors = %d, want 1", s.totalErrors)
+	}
+	if s.uncorrectedErrors != 1 {
+		t.Fatalf("uncorrectedErrors = %d, want 1", s.uncorrectedErrors)
+	}
+	if s.typedCharCount != 19 {
+		t.Fatalf("typedCharCount = %d, want 19", s.typedCharCount)
+	}
+	if len(s.wpmSamples) != 4 {
+		t.Fatalf("wpmSamples len = %d, want 4", len(s.wpmSamples))
+	}
+	if s.wordIndex != 4 {
+		t.Fatalf("wordIndex = %d, want 4", s.wordIndex)
+	}
+	if !s.isDone() {
+		t.Fatal("expected session done")
+	}
+}
+
+func TestTypingStateRuneBufferUTF8(t *testing.T) {
+	s := newTypingState([]string{"café", "世界"}, false, func() time.Time { return time.Unix(100, 0) })
+	s.applyRunes([]rune("café"))
+	r := s.applyCommitWord()
+	if !r.advanced {
+		t.Fatalf("commit café: %+v", r)
+	}
+	s.applyRunes([]rune("世界"))
+	r = s.applyCommitWord()
+	if !r.advanced || !s.isDone() {
+		t.Fatalf("commit 世界: %+v done=%v", r, s.isDone())
+	}
+	if s.typedCharCount != 7 { // space + 世界(2) after café(4) with space between words
+		t.Fatalf("typedCharCount = %d, want 7", s.typedCharCount)
+	}
+}
+
+func TestTypingStatePasteAndBackspaceRuneBuffer(t *testing.T) {
+	s := newTypingState([]string{"hello"}, false, func() time.Time { return time.Unix(100, 0) })
+	s.applyRunes([]rune("hellx"))
+	s.applyBackspace()
+	s.applyRunes([]rune("o"))
+	if s.current != "hello" {
+		t.Fatalf("current = %q, want hello", s.current)
+	}
+}

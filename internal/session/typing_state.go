@@ -11,10 +11,13 @@ import (
 // typingState holds word-lane typing progress, metrics, and replay trace — independent of Bubble Tea.
 type typingState struct {
 	words             []string
+	wordRunes         [][]rune
+	wordLens          []int
 	typedWords        []string
 	wordMatches       []bool
 	wordIndex         int
 	current           string
+	currentRunes      []rune
 	strict            bool
 	typedCharCount    int
 	totalErrors       int
@@ -32,13 +35,41 @@ func newTypingState(words []string, strict bool, now func() time.Time) *typingSt
 		now = time.Now
 	}
 	n := len(words)
+	wordRunes := make([][]rune, n)
+	wordLens := make([]int, n)
+	traceCap := n * 6
+	if traceCap < 16 {
+		traceCap = 16
+	}
+	for i, w := range words {
+		wordRunes[i] = []rune(w)
+		wordLens[i] = len(wordRunes[i])
+	}
 	return &typingState{
 		words:       words,
+		wordRunes:   wordRunes,
+		wordLens:    wordLens,
 		strict:      strict,
 		now:         now,
 		typedWords:  make([]string, 0, n),
 		wordMatches: make([]bool, 0, n),
 		wpmSamples:  make([]float64, 0, n),
+		typingTrace: make([]model.ReplayEvent, 0, traceCap),
+	}
+}
+
+func (s *typingState) syncCurrentString() {
+	s.current = string(s.currentRunes)
+}
+
+// reconcileCurrentRunes rebuilds currentRunes from current when they diverge (e.g. tests set current directly).
+func (s *typingState) reconcileCurrentRunes() {
+	if s.current == "" {
+		s.currentRunes = nil
+		return
+	}
+	if string(s.currentRunes) != s.current {
+		s.currentRunes = []rune(s.current)
 	}
 }
 
@@ -63,13 +94,14 @@ func (s *typingState) applyRunes(runes []rune) (sessionClockStarted bool, mistak
 	if len(runes) == 0 || s.wordIndex >= len(s.words) {
 		return false, false
 	}
+	s.reconcileCurrentRunes()
 	if s.startedAt.IsZero() {
 		s.startedAt = s.now().UTC()
 		sessionClockStarted = true
 	}
 
-	target := []rune(s.words[s.wordIndex])
-	current := []rune(s.current)
+	target := s.wordRunes[s.wordIndex]
+	current := s.currentRunes
 	for _, r := range runes {
 		s.appendTraceKey(r)
 		pos := len(current)
@@ -87,7 +119,8 @@ func (s *typingState) applyRunes(runes []rune) (sessionClockStarted bool, mistak
 		}
 		current = append(current, r)
 	}
-	s.current = string(current)
+	s.currentRunes = current
+	s.syncCurrentString()
 	return sessionClockStarted, mistake
 }
 
@@ -104,12 +137,13 @@ func (s *typingState) applyCommitWord() commitWordResult {
 	if s.wordIndex >= len(s.words) {
 		return r
 	}
+	s.reconcileCurrentRunes()
 
-	currentInput := s.current
-	if currentInput == "" {
+	if len(s.currentRunes) == 0 {
 		r.emptyCurrent = true
 		return r
 	}
+	currentInput := s.current
 	targetWord := s.words[s.wordIndex]
 	matched := currentInput == targetWord
 	if s.strict && !matched {
@@ -128,17 +162,18 @@ func (s *typingState) applyCommitWord() commitWordResult {
 		s.totalErrors++
 	}
 
-	_, mismatches := scoring.CompareRunes([]rune(targetWord), []rune(currentInput))
+	_, mismatches := scoring.CompareRunes(s.wordRunes[s.wordIndex], s.currentRunes)
 	s.uncorrectedErrors += mismatches
 
 	if s.wordIndex > 0 {
 		s.typedCharCount++
 	}
-	s.typedCharCount += utf8.RuneCountInString(currentInput)
+	s.typedCharCount += len(s.currentRunes)
 
 	s.typedWords = append(s.typedWords, currentInput)
 	s.wordMatches = append(s.wordMatches, matched)
 	s.wordIndex++
+	s.currentRunes = nil
 	s.current = ""
 	s.appendWPMSample()
 	r.advanced = true
@@ -147,11 +182,13 @@ func (s *typingState) applyCommitWord() commitWordResult {
 
 // applyBackspace removes the last rune from the current word buffer and records trace when applicable.
 func (s *typingState) applyBackspace() {
-	if s.current == "" {
+	s.reconcileCurrentRunes()
+	if len(s.currentRunes) == 0 {
 		return
 	}
 	s.appendTraceBackspace()
-	s.current = removeLastRune(s.current)
+	s.currentRunes = s.currentRunes[:len(s.currentRunes)-1]
+	s.syncCurrentString()
 }
 
 func (s *typingState) appendWPMSample() {

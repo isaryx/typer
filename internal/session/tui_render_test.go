@@ -156,7 +156,8 @@ func TestActiveWordContentOffsetNoWords(t *testing.T) {
 		nil,
 	)
 	m.width = 80
-	_, _, vis := m.activeWordContentOffset(m.promptInnerWidth(), nil, nil)
+	pl := m.ensurePlainLayout()
+	_, _, vis := m.activeWordContentOffset(pl, 0)
 	if vis {
 		t.Fatalf("expected visible=false with no words")
 	}
@@ -177,14 +178,12 @@ func TestBorderDynamicCaretXMovesWithActiveWord(t *testing.T) {
 		nil,
 	)
 	m.width = 80
-	lines, firstWordIdx, _ := m.passageWrappedLayout()
-	_, cxFirst, _, ok := m.renderPassageFrame(0, lines, firstWordIdx)
+	cxFirst, _, ok := m.passageFrameForTest(0)
 	if !ok {
 		t.Fatal("expected border cursor")
 	}
 	m.wordIndex = 2
-	lines, firstWordIdx, _ = m.passageWrappedLayout()
-	_, cxThird, _, ok2 := m.renderPassageFrame(0, lines, firstWordIdx)
+	cxThird, _, ok2 := m.passageFrameForTest(0)
 	if !ok2 {
 		t.Fatal("expected border cursor on third word")
 	}
@@ -210,8 +209,7 @@ func TestGhostCaretXAtWordStartMatchesPassageInnerOffset(t *testing.T) {
 	m.width = 80
 	m.shadowWordIndex = 0
 	m.shadowCurrent = ""
-	lines, idx, _ := m.passageWrappedLayout()
-	x, _, ok := m.ghostCaretViewCoords(0, lines, idx)
+	x, _, ok := m.ghostCaretForTest(0)
 	if !ok {
 		t.Fatal("expected ghost in viewport")
 	}

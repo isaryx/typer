@@ -26,6 +26,11 @@ func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 	if !res.advanced {
 		return nil
 	}
+	committed := m.wordIndex - 1
+	m.bumpWordStyle(committed)
+	if m.wordIndex < len(m.wordStyleGen) {
+		m.bumpWordStyle(m.wordIndex)
+	}
 	if m.wordIndex > 0 && m.wordMatches[m.wordIndex-1] {
 		m.status = ""
 	}
@@ -37,6 +42,7 @@ func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 
 func (m *typingSessionModel) appendRunes(runes []rune) tea.Cmd {
 	clock, mistake := m.typingState.applyRunes(runes)
+	m.bumpWordStyle(m.wordIndex)
 	if mistake && m.bellOut != nil {
 		fmt.Fprint(m.bellOut, "\a")
 	}
@@ -48,6 +54,7 @@ func (m *typingSessionModel) appendRunes(runes []rune) tea.Cmd {
 
 func (m *typingSessionModel) applyBackspace() {
 	m.typingState.applyBackspace()
+	m.bumpWordStyle(m.wordIndex)
 }
 
 func (m *typingSessionModel) afterSessionClockStart() tea.Cmd {
