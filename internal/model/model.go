@@ -7,6 +7,7 @@ const (
 	ModePassage = "passage"
 	ModeWords   = "words"
 	ModeQuote   = "quote"
+	ModeHangman = "hangman"
 )
 
 type Prompt struct {

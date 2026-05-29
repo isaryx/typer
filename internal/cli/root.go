@@ -31,6 +31,8 @@ func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return runCredits(stdout)
 	case "key-press":
 		return runKeyPress(ctx, args[1:], stdin, stdout)
+	case "play":
+		return runPlay(ctx, args[1:], stdin, stdout)
 	case "--version", "-v":
 		return runVersion(stdout)
 	case resetProgressFlag:

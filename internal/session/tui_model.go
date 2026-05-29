@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"typer/internal/game/hangman"
 	"typer/internal/model"
 	"typer/internal/ui"
 )
@@ -30,6 +31,8 @@ type typingSessionResult struct {
 	CorrectKeystrokes int
 	UncorrectedErrors int
 	TypingTrace       []model.ReplayEvent
+	HangmanOutcome    string // "", "win", "lose"
+	HangmanStage      int
 }
 
 type typingSessionModel struct {
@@ -81,9 +84,14 @@ type typingSessionModel struct {
 	lastFingerHintKey   rune
 	cachedFingerHands   string
 	hasCachedFingerHands bool
+
+	// Hangman game overlay (nil for normal sessions).
+	hangman            *hangman.State
+	hangmanOutcome     string
+	hangmanPendingQuit bool
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer) *typingSessionModel {
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer, hm *hangman.State) *typingSessionModel {
 	words := strings.Fields(prompt.Content)
 
 	shadowStrict := false
@@ -120,6 +128,7 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		styledAtGen:       make([]uint64, n),
 		styledSegments:    make([]string, n),
 		bellOut:           bellOut,
+		hangman:           hm,
 	}
 }
 
@@ -141,11 +150,15 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.PasteMsg:
 		// v2: bracketed paste is a separate message (not KeyPressMsg with long Text).
-		if m.isDone() {
+		if m.isDone() || m.hangmanPendingQuit {
 			return m, tea.Quit
 		}
 		cmd := m.appendRunes([]rune(msg.Content))
 		m.status = ""
+		if m.hangmanPendingQuit {
+			m.endedAt = m.now().UTC()
+			return m, tea.Quit
+		}
 		return m, cmd
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -154,7 +167,7 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.endedAt = m.now().UTC()
 			return m, tea.Quit
 		}
-		if m.isDone() {
+		if m.isDone() || m.hangmanPendingQuit {
 			return m, tea.Quit
 		}
 		switch msg.String() {
@@ -166,6 +179,9 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.commitCurrentWord()
 			if m.isDone() {
 				m.endedAt = m.now().UTC()
+				if m.hangman != nil {
+					m.hangmanOutcome = "win"
+				}
 				return m, tea.Quit
 			}
 			return m, cmd
@@ -173,6 +189,10 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(msg.Text) > 0 {
 				cmd := m.appendRunes([]rune(msg.Text))
 				m.status = ""
+				if m.hangmanPendingQuit {
+					m.endedAt = m.now().UTC()
+					return m, tea.Quit
+				}
 				return m, cmd
 			}
 		}
@@ -200,6 +220,10 @@ func (m *typingSessionModel) View() tea.View {
 	}
 
 	writeViewLine(m.styles.meta.Width(tw).Render(m.sessionHeadingLine()))
+	if m.hangman != nil {
+		b.WriteString(hangman.RenderBoxWithStats(m.hangman, tw, m.styles.border, m.styles.meta))
+		b.WriteString("\n")
+	}
 	if !m.hideHint {
 		writeViewLine(m.styles.meta.Width(tw).Render(inputHint))
 	}
@@ -308,6 +332,7 @@ type typingSessionRunOpts struct {
 	hideHint       bool
 	inputPlacement model.InputPlacement
 	noAudible      bool
+	hangman        *hangman.State
 }
 
 func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, o typingSessionRunOpts) (typingSessionResult, error) {
@@ -315,7 +340,7 @@ func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, pr
 	if !o.noAudible {
 		bellOut = output
 	}
-	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement, bellOut)
+	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement, bellOut, o.hangman)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

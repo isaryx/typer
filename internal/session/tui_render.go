@@ -72,6 +72,9 @@ func (m *typingSessionModel) sessionHeadingLine() string {
 	if mode == "" {
 		mode = "unknown"
 	}
+	if mode == model.ModeHangman || m.hangman != nil {
+		return fmt.Sprintf("typer · %s", mode)
+	}
 	strictLabel := "strict"
 	if !m.strict {
 		strictLabel = "non-strict"

@@ -46,6 +46,12 @@ func (m *typingSessionModel) appendRunes(runes []rune) tea.Cmd {
 	if mistake && m.bellOut != nil {
 		fmt.Fprint(m.bellOut, "\a")
 	}
+	if mistake && m.hangman != nil {
+		if m.hangman.RecordMistake() {
+			m.hangmanOutcome = "lose"
+			m.hangmanPendingQuit = true
+		}
+	}
 	if clock {
 		return m.afterSessionClockStart()
 	}
@@ -78,7 +84,7 @@ func (m *typingSessionModel) result() typingSessionResult {
 		TypedText:         strings.Join(m.typedWords, " "),
 		StartedAt:         started,
 		EndedAt:           ended,
-		Completed:         m.isDone() && !m.aborted,
+		Completed:         m.isDone() && !m.aborted && m.hangmanOutcome != "lose",
 		Aborted:           m.aborted,
 		WPMSamples:        append([]float64(nil), m.wpmSamples...),
 		Strict:            m.strict,
@@ -87,5 +93,14 @@ func (m *typingSessionModel) result() typingSessionResult {
 		CorrectKeystrokes: m.correctKeystrokes,
 		UncorrectedErrors: m.uncorrectedErrors,
 		TypingTrace:       append([]model.ReplayEvent(nil), m.typingTrace...),
+		HangmanOutcome:    m.hangmanOutcome,
+		HangmanStage:      m.hangmanStage(),
 	}
+}
+
+func (m *typingSessionModel) hangmanStage() int {
+	if m.hangman == nil {
+		return 0
+	}
+	return m.hangman.Stage()
 }

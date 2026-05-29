@@ -79,3 +79,11 @@ func runQuoteFetchSplash(ctx context.Context, out io.Writer, gen func() (model.P
 		}
 	}
 }
+
+// NextQuotePrompt loads one quote, optionally showing the remote fetch splash on out.
+func NextQuotePrompt(ctx context.Context, out io.Writer, gen func() (model.Prompt, error), remoteSplash bool) (model.Prompt, error) {
+	if remoteSplash {
+		return runQuoteFetchSplash(ctx, out, gen)
+	}
+	return gen()
+}

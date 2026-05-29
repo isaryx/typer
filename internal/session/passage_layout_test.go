@@ -31,6 +31,7 @@ func TestPlainLayoutStyledWidthInvariant(t *testing.T) {
 		false, nil, false, false, false, false,
 		model.DefaultInputPlacement(),
 		nil,
+		nil,
 	)
 	m.width = 80
 	pl := m.ensurePlainLayout()

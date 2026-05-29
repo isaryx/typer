@@ -35,6 +35,7 @@ func benchTypingModel(wordCount int, width int) *typingSessionModel {
 		false, nil, false, false, false, false,
 		model.DefaultInputPlacement(),
 		nil,
+		nil,
 	)
 	m.width = width
 	return m

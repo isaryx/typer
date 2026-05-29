@@ -27,6 +27,7 @@ func TestViewQuoteModeSourceRelocatedToBottomWhenInputOnTopBorder(t *testing.T) 
 		false,
 		model.InputPlacement{V: model.InputVerticalOnTopBorder, H: model.InputHorizontalCenter},
 		nil,
+		nil,
 	)
 	m.width = 88
 	v := m.View().Content
@@ -66,6 +67,7 @@ func TestViewOnBottomBorderCombinesAuthorAndSource(t *testing.T) {
 		false,
 		false,
 		model.InputPlacement{V: model.InputVerticalOnBottomBorder, H: model.InputHorizontalCenter},
+		nil,
 		nil,
 	)
 	m.width = 88
@@ -108,6 +110,7 @@ func TestViewQuoteModeShowsSourceInTopBorder(t *testing.T) {
 		false,
 		model.InputPlacement{},
 		nil,
+		nil,
 	)
 	m.width = 88
 	v := m.View().Content
@@ -133,6 +136,7 @@ func TestViewQuoteModeSeedDoesNotShowRemoteCaption(t *testing.T) {
 		false,
 		model.InputPlacement{},
 		nil,
+		nil,
 	)
 	m.width = 88
 	v := m.View().Content
@@ -153,6 +157,7 @@ func TestActiveWordContentOffsetNoWords(t *testing.T) {
 		false,
 		false,
 		model.InputPlacement{},
+		nil,
 		nil,
 	)
 	m.width = 80
@@ -175,6 +180,7 @@ func TestBorderDynamicCaretXMovesWithActiveWord(t *testing.T) {
 		false,
 		false,
 		model.InputPlacement{V: model.InputVerticalOnTopBorderDynamic, H: model.InputHorizontalCenter},
+		nil,
 		nil,
 	)
 	m.width = 80
@@ -204,6 +210,7 @@ func TestGhostCaretXAtWordStartMatchesPassageInnerOffset(t *testing.T) {
 		false,
 		false,
 		model.InputPlacement{},
+		nil,
 		nil,
 	)
 	m.width = 80
@@ -259,6 +266,7 @@ func TestTypingReduceMotionInlineCaretHasNoBlinkSGR(t *testing.T) {
 		false,
 		model.InputPlacement{},
 		nil,
+		nil,
 	)
 	m.wordIndex = 0
 	m.current = "h"
@@ -281,6 +289,7 @@ func TestViewQuoteModeTypefitSourceLabel(t *testing.T) {
 		false,
 		false,
 		model.InputPlacement{},
+		nil,
 		nil,
 	)
 	m.width = 80
