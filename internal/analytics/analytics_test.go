@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -96,11 +97,41 @@ func TestBuildSummaryDeterministicAveragesAndCharBuckets(t *testing.T) {
 			t.Fatalf("TopErrorChars[%d] = %#v, want %#v", i, s.TopErrorChars[i], wantTop[i])
 		}
 	}
-	if len(s.TopMissingChars) != 1 || s.TopMissingChars[0] != (CharCount{Key: "<newline>", Count: 1}) {
+	if len(s.TopMissingChars) != 0 {
 		t.Fatalf("unexpected TopMissingChars: %#v", s.TopMissingChars)
 	}
-	if len(s.TopUnexpectedChar) != 1 || s.TopUnexpectedChar[0] != (CharCount{Key: "!", Count: 1}) {
-		t.Fatalf("unexpected TopUnexpectedChar: %#v", s.TopUnexpectedChar)
+	if len(s.TopUnexpectedChar) != 2 {
+		t.Fatalf("TopUnexpectedChar length = %d, want 2", len(s.TopUnexpectedChar))
+	}
+	wantUnexpected := []CharCount{
+		{Key: "!", Count: 1},
+		{Key: "x", Count: 1},
+	}
+	for i := range wantUnexpected {
+		if s.TopUnexpectedChar[i] != wantUnexpected[i] {
+			t.Fatalf("TopUnexpectedChar[%d] = %#v, want %#v", i, s.TopUnexpectedChar[i], wantUnexpected[i])
+		}
+	}
+}
+
+func TestBuildSummaryPromptNormalizationMatchesFlatText(t *testing.T) {
+	flat := model.SessionResult{
+		Prompt:    model.Prompt{Content: "hello world"},
+		TypedText: "hello worl",
+		Metrics:   model.SessionMetrics{GrossWPM: 50, NetWPM: 45, AdjustedWPM: 40, Accuracy: 90, Errors: 1},
+	}
+	withNewlines := model.SessionResult{
+		Prompt:    model.Prompt{Content: "hello\n\nworld"},
+		TypedText: "hello worl",
+		Metrics:   flat.Metrics,
+	}
+	gotFlat := BuildSummary([]model.SessionResult{flat}, 5)
+	gotNL := BuildSummary([]model.SessionResult{withNewlines}, 5)
+	if !slices.Equal(gotFlat.TopMissingChars, gotNL.TopMissingChars) {
+		t.Fatalf("TopMissingChars differ: flat=%#v newline=%#v", gotFlat.TopMissingChars, gotNL.TopMissingChars)
+	}
+	if !slices.Equal(gotFlat.TopErrorChars, gotNL.TopErrorChars) {
+		t.Fatalf("TopErrorChars differ: flat=%#v newline=%#v", gotFlat.TopErrorChars, gotNL.TopErrorChars)
 	}
 }
 

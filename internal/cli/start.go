@@ -119,15 +119,16 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	}
 
 	runner := session.NewRunner(provider)
-	historyStore, err := storage.NewHistoryStore()
-	if err != nil {
-		return err
-	}
+	var historyStore *storage.HistoryStore
 	if !noGhost {
-		hst := historyStore
+		hs, err := storage.NewHistoryStore()
+		if err != nil {
+			return err
+		}
+		historyStore = hs
 		runner.GhostBaseline = func(ctx context.Context, p model.Prompt) (*model.SessionResult, error) {
 			h := model.PromptContentHash(p.Content)
-			best, err := hst.BestSessionForGhost(h)
+			best, err := historyStore.BestSessionForGhost(h)
 			if err != nil {
 				if errors.Is(err, storage.ErrNoGhostCandidate) {
 					return nil, nil
@@ -145,7 +146,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, nil, historyStore)
+		result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, nil, &historyStore)
 		if err != nil {
 			return err
 		}

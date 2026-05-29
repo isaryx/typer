@@ -50,7 +50,9 @@ func BuildSummary(sessions []model.SessionResult, topN int) Summary {
 		out.AvgAccuracy += s.Metrics.Accuracy
 		out.AvgErrors += float64(s.Metrics.Errors)
 		netSamples = append(netSamples, s.Metrics.NetWPM)
-		collectCharErrors([]rune(s.Prompt.Content), []rune(s.TypedText), errorMap, missingMap, extraMap)
+		targetRunes := []rune(strings.Join(strings.Fields(s.Prompt.Content), " "))
+		typedRunes := []rune(s.TypedText)
+		collectCharErrors(targetRunes, typedRunes, errorMap, missingMap, extraMap)
 	}
 
 	n := float64(len(sessions))

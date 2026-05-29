@@ -41,10 +41,25 @@ func readJSONFile(path string, v any) (exists bool, err error) {
 // writeJSONFileAtomic marshals v with 2-space indent and writes to path via
 // a tmp-file+rename so readers never see a half-written document.
 func writeJSONFileAtomic(path string, v any) error {
+	return writeJSONFileAtomicWithIndent(path, v, true)
+}
+
+// writeJSONFileAtomicCompact marshals v without indent (smaller, faster I/O).
+func writeJSONFileAtomicCompact(path string, v any) error {
+	return writeJSONFileAtomicWithIndent(path, v, false)
+}
+
+func writeJSONFileAtomicWithIndent(path string, v any, indent bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), configDirPerm); err != nil {
 		return fmt.Errorf("mkdir for %s: %w", path, err)
 	}
-	data, err := json.MarshalIndent(v, "", "  ")
+	var data []byte
+	var err error
+	if indent {
+		data, err = json.MarshalIndent(v, "", "  ")
+	} else {
+		data, err = json.Marshal(v)
+	}
 	if err != nil {
 		return fmt.Errorf("marshal json for %s: %w", path, err)
 	}
@@ -56,9 +71,6 @@ func writeJSONFileAtomic(path string, v any) error {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("rename %s to %s: %w", tmp, path, err)
 	}
-	// Rename preserves the tmp file's mode, but if path pre-existed with wider
-	// perms we want to tighten it. Ignore errors on platforms (e.g. Windows)
-	// where chmod semantics differ.
 	_ = os.Chmod(path, configFilePerm)
 	return nil
 }

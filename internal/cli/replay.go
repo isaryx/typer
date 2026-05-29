@@ -97,7 +97,7 @@ func runReplay(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	opts.NoAudible = noAudible
 	applySessionDisplayFromSettings(&opts, settings)
 
-	result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, &baseline, store)
+	result, err := runSessionAndPersist(ctx, runner, opts, stdin, stdout, &baseline, &store)
 	if err != nil {
 		return err
 	}

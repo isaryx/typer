@@ -24,7 +24,19 @@ Rough map of where things live:
 - `internal/model` — Shared types (sessions, prompts, replay trace).
 - `internal/text` — Prompt providers (words, passages, quotes).
 - `internal/storage` — Local JSON history, settings, quote cache.
+  - `history.json` — session metrics and metadata (typing traces stored separately).
+  - `traces.json` — sidecar map of session ID → replay trace events (ghost/replay only).
 - `internal/scoring` — WPM and related metrics.
+
+## Performance
+
+Runtime typing performance is handled in `internal/session` (layout cache, keystroke path). Storage uses an in-memory history cache, compact JSON writes, and trace sidecar I/O so list/stats commands avoid parsing large trace payloads. Terminal rendering relies on Bubble Tea cell diffing rather than app-level View caching.
+
+Benchmarks:
+
+```bash
+go test -bench=. -benchmem ./internal/storage/... ./internal/analytics/...
+```
 
 ## Test and Quality Checks
 

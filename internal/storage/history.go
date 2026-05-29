@@ -3,7 +3,6 @@ package storage
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 
@@ -24,8 +23,13 @@ var ErrNthOutOfRange = errors.New("nth out of range")
 
 const historyVersion = 1
 
+// HistoryStore persists session results in history.json with an in-memory cache
+// and optional traces sidecar (traces.json).
 type HistoryStore struct {
-	path string
+	path       string
+	tracesPath string
+	cache      *historyCache
+	traces     *tracesCache
 }
 
 func NewHistoryStore() (*HistoryStore, error) {
@@ -37,37 +41,81 @@ func NewHistoryStore() (*HistoryStore, error) {
 }
 
 func NewHistoryStoreAt(path string) *HistoryStore {
-	return &HistoryStore{path: path}
+	dir := filepath.Dir(path)
+	return &HistoryStore{
+		path:       path,
+		tracesPath: filepath.Join(dir, "traces.json"),
+	}
 }
 
-func (s *HistoryStore) Append(result model.SessionResult) error {
-	h, err := s.read()
+func (s *HistoryStore) ensureLoaded() error {
+	if s.cache != nil {
+		return nil
+	}
+	file := model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}
+	if _, err := readJSONFile(s.path, &file); err != nil {
+		return err
+	}
+	if file.Version == 0 {
+		file.Version = historyVersion
+	}
+	if file.Sessions == nil {
+		file.Sessions = []model.SessionResult{}
+	}
+	tc, err := s.loadTracesFromDisk()
 	if err != nil {
 		return err
 	}
-	h.Sessions = append(h.Sessions, result)
-	if len(h.Sessions) > model.MaxRetainedHistorySessions {
-		h.Sessions = slices.Clone(h.Sessions[len(h.Sessions)-model.MaxRetainedHistorySessions:])
-	}
-	h.Version = historyVersion
-	return writeJSONFileAtomic(s.path, h)
+	s.traces = tc
+	s.cache = newHistoryCache(file)
+	s.migrateInlineTraces(s.cache, tc)
+	return nil
 }
 
-// GetByID returns the session with the given id, or an error if not found.
+func (s *HistoryStore) persistIfDirty() error {
+	if s.cache == nil || !s.cache.dirty {
+		return nil
+	}
+	s.cache.file.Version = historyVersion
+	if err := writeJSONFileAtomicCompact(s.path, s.cache.file); err != nil {
+		return err
+	}
+	s.cache.dirty = false
+	return nil
+}
+
+func (s *HistoryStore) Append(result model.SessionResult) error {
+	if err := s.ensureLoaded(); err != nil {
+		return err
+	}
+	stored, trace := s.splitTraceForStorage(result)
+	if len(trace) > 0 {
+		s.traces.setTrace(stored.ID, trace)
+	}
+	s.cache.file.Sessions = append(s.cache.file.Sessions, stored)
+	idx := len(s.cache.file.Sessions) - 1
+	s.cache.indexSessionAt(idx, s.traces.file.Traces)
+	s.cache.dirty = true
+	s.cache.trimToMax(model.MaxRetainedHistorySessions, s.traces)
+	if err := s.persistTracesIfDirty(); err != nil {
+		return err
+	}
+	return s.persistIfDirty()
+}
+
 func (s *HistoryStore) GetByID(id string) (model.SessionResult, error) {
-	h, err := s.read()
-	if err != nil {
+	if err := s.ensureLoaded(); err != nil {
 		return model.SessionResult{}, err
 	}
-	for _, sess := range h.Sessions {
-		if sess.ID == id {
-			return sess, nil
-		}
+	idx, ok := s.cache.byID[id]
+	if !ok {
+		return model.SessionResult{}, fmt.Errorf("no session with id %q: %w", id, ErrSessionNotFound)
 	}
-	return model.SessionResult{}, fmt.Errorf("no session with id %q: %w", id, ErrSessionNotFound)
+	sess := s.cache.file.Sessions[idx]
+	s.attachTrace(&sess)
+	return sess, nil
 }
 
-// NthNewest returns the n-th newest session (n=1 is most recent), matching the order of history --last.
 func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
 	if n < 1 {
 		return model.SessionResult{}, fmt.Errorf("nth must be at least 1: %w", ErrNthOutOfRange)
@@ -79,97 +127,71 @@ func (s *HistoryStore) NthNewest(n int) (model.SessionResult, error) {
 	if len(list) < n {
 		return model.SessionResult{}, fmt.Errorf("only %d session(s) in history: %w", len(list), ErrInsufficientHistory)
 	}
-	return list[n-1], nil
+	sess := list[n-1]
+	s.attachTrace(&sess)
+	return sess, nil
 }
 
-// SessionsWithContentHash returns sessions whose stored or derived content hash equals hash.
 func (s *HistoryStore) SessionsWithContentHash(hash string) ([]model.SessionResult, error) {
-	h, err := s.read()
-	if err != nil {
+	if err := s.ensureLoaded(); err != nil {
 		return nil, err
 	}
 	if hash == "" {
 		return nil, nil
 	}
 	var out []model.SessionResult
-	for _, sess := range h.Sessions {
-		if model.SessionContentHashKey(sess) == hash {
-			out = append(out, sess)
-		}
+	for _, idx := range s.cache.byHash[hash] {
+		out = append(out, s.cache.file.Sessions[idx])
 	}
 	return out, nil
 }
 
-// BestSessionForGhost picks the strongest prior run for shadow replay: non-aborted, has TypingTrace,
-// best by model.BetterGhostCandidate among sessions matching the content hash.
 func (s *HistoryStore) BestSessionForGhost(hash string) (model.SessionResult, error) {
-	sessions, err := s.SessionsWithContentHash(hash)
+	if err := s.ensureLoaded(); err != nil {
+		return model.SessionResult{}, err
+	}
+	if hash == "" {
+		return model.SessionResult{}, ErrNoGhostCandidate
+	}
+	bestID, ok := s.cache.ghostBest[hash]
+	if !ok {
+		return model.SessionResult{}, ErrNoGhostCandidate
+	}
+	sess, err := s.GetByID(bestID)
 	if err != nil {
 		return model.SessionResult{}, err
 	}
-	var candidates []model.SessionResult
-	for _, sess := range sessions {
-		if sess.Aborted || len(sess.TypingTrace) == 0 {
-			continue
-		}
-		candidates = append(candidates, sess)
-	}
-	if len(candidates) == 0 {
-		return model.SessionResult{}, ErrNoGhostCandidate
-	}
-	best := candidates[0]
-	for _, c := range candidates[1:] {
-		if model.BetterGhostCandidate(c, best) {
-			best = c
-		}
-	}
-	return best, nil
+	return sess, nil
 }
 
 func (s *HistoryStore) List(last int) ([]model.SessionResult, error) {
-	h, err := s.read()
-	if err != nil {
+	if err := s.ensureLoaded(); err != nil {
 		return nil, err
 	}
 	start := 0
-	if last > 0 && last < len(h.Sessions) {
-		start = len(h.Sessions) - last
+	sessions := s.cache.file.Sessions
+	if last > 0 && last < len(sessions) {
+		start = len(sessions) - last
 	}
-	out := slices.Clone(h.Sessions[start:])
+	out := slices.Clone(sessions[start:])
 	slices.Reverse(out)
 	return out, nil
 }
 
 func (s *HistoryStore) Reset() error {
-	return writeJSONFileAtomic(s.path, model.HistoryFile{
-		Version:  historyVersion,
-		Sessions: []model.SessionResult{},
-	})
+	s.cache = newHistoryCache(model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}})
+	s.traces = newTracesCache()
+	s.cache.dirty = true
+	s.traces.dirty = true
+	if err := s.persistTracesIfDirty(); err != nil {
+		return err
+	}
+	return s.persistIfDirty()
 }
 
 func (s *HistoryStore) read() (model.HistoryFile, error) {
-	h := model.HistoryFile{Version: historyVersion, Sessions: []model.SessionResult{}}
-	if _, err := readJSONFile(s.path, &h); err != nil {
+	if err := s.ensureLoaded(); err != nil {
 		return model.HistoryFile{}, err
 	}
-	if h.Version == 0 {
-		h.Version = historyVersion
-	}
-	return h, nil
-}
-
-func appConfigDir() (string, error) {
-	base, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("user config dir: %w", err)
-	}
-	return filepath.Join(base, "typer"), nil
-}
-
-func appCacheDir() (string, error) {
-	base, err := os.UserCacheDir()
-	if err != nil {
-		return "", fmt.Errorf("user cache dir: %w", err)
-	}
-	return filepath.Join(base, "typer"), nil
+	return s.cache.file, nil
 }

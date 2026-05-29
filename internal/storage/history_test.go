@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +21,7 @@ const (
 
 func newHistoryStoreAt(t *testing.T) *HistoryStore {
 	t.Helper()
-	return &HistoryStore{path: filepath.Join(t.TempDir(), historyJSONFile)}
+	return NewHistoryStoreAt(filepath.Join(t.TempDir(), historyJSONFile))
 }
 
 func TestNewHistoryStoreUsesConfigDir(t *testing.T) {
@@ -115,7 +117,7 @@ func TestHistoryStoreWritesTightPermissions(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, historyJSONFile)
-	store := &HistoryStore{path: path}
+	store := NewHistoryStoreAt(path)
 	if err := store.Append(model.SessionResult{ID: "1"}); err != nil {
 		t.Fatalf(errAppendFmt, err)
 	}
@@ -335,5 +337,159 @@ func TestHistoryStoreBestSessionForGhost(t *testing.T) {
 
 	if _, err := store.BestSessionForGhost(model.PromptContentHash("unknown")); !errors.Is(err, ErrNoGhostCandidate) {
 		t.Fatalf("want ErrNoGhostCandidate, got %v", err)
+	}
+}
+
+func TestHistoryStoreCacheReusesMemoryAcrossCalls(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	if err := store.Append(model.SessionResult{ID: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if store.cache == nil {
+		t.Fatal("expected cache after append")
+	}
+	cachePtr := store.cache
+	if _, err := store.List(10); err != nil {
+		t.Fatal(err)
+	}
+	if store.cache != cachePtr {
+		t.Fatal("List should not reload from disk")
+	}
+	if _, err := store.GetByID("1"); err != nil {
+		t.Fatal(err)
+	}
+	if store.cache != cachePtr {
+		t.Fatal("GetByID should not reload from disk")
+	}
+}
+
+func TestHistoryStoreSidecarTraceRoundTrip(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	trace := []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}}
+	if err := store.Append(model.SessionResult{
+		ID:          "s1",
+		TypingTrace: trace,
+		Prompt:      model.Prompt{Content: "hello"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetByID("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.TypingTrace) != 1 || got.TypingTrace[0].Rune != "x" {
+		t.Fatalf("trace = %#v, want one key event", got.TypingTrace)
+	}
+	reloaded := NewHistoryStoreAt(store.path)
+	sess, err := reloaded.GetByID("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sess.TypingTrace) != 1 {
+		t.Fatalf("reloaded trace = %#v", sess.TypingTrace)
+	}
+}
+
+func TestHistoryStoreListOmitsTraces(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	trace := []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "a"}}
+	if err := store.Append(model.SessionResult{ID: "s1", TypingTrace: trace}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := store.List(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || len(list[0].TypingTrace) != 0 {
+		t.Fatalf("List should omit traces, got %#v", list[0].TypingTrace)
+	}
+}
+
+func TestHistoryStoreMigratesInlineTracesToSidecar(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, historyJSONFile)
+	trace := []model.ReplayEvent{{AtMS: 1, Kind: model.ReplayEventKey, Rune: "m"}}
+	if err := writeJSONFileAtomic(path, model.HistoryFile{
+		Version: historyVersion,
+		Sessions: []model.SessionResult{{
+			ID:          "legacy",
+			TypingTrace: trace,
+			Prompt:      model.Prompt{Content: "text"},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store := NewHistoryStoreAt(path)
+	if err := store.Append(model.SessionResult{ID: "new"}); err != nil {
+		t.Fatal(err)
+	}
+	file, err := store.read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sess := range file.Sessions {
+		if len(sess.TypingTrace) != 0 {
+			t.Fatalf("session %q still has inline trace", sess.ID)
+		}
+	}
+	got, err := store.GetByID("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.TypingTrace) != 1 || got.TypingTrace[0].Rune != "m" {
+		t.Fatalf("legacy trace = %#v", got.TypingTrace)
+	}
+}
+
+func TestHistoryStoreGhostIndexAfterRetentionEviction(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	text := "evict ghost"
+	h := model.PromptContentHash(text)
+	trace := []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "a"}}
+	seed := make([]model.SessionResult, model.MaxRetainedHistorySessions)
+	for i := range seed {
+		seed[i] = model.SessionResult{ID: fmt.Sprintf("fill-%d", i)}
+	}
+	if err := writeJSONFileAtomic(store.path, model.HistoryFile{Version: historyVersion, Sessions: seed}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "ghost-old",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: text},
+		TypingTrace: trace,
+		Metrics:     model.SessionMetrics{NetWPM: 50},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(model.SessionResult{
+		ID:          "ghost-best",
+		ContentHash: h,
+		Prompt:      model.Prompt{Content: text},
+		TypingTrace: trace,
+		Metrics:     model.SessionMetrics{NetWPM: 90},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.BestSessionForGhost(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "ghost-best" {
+		t.Fatalf("ghost = %q, want ghost-best", got.ID)
+	}
+}
+
+func TestHistoryWritesCompactJSON(t *testing.T) {
+	store := newHistoryStoreAt(t)
+	if err := store.Append(model.SessionResult{ID: "1", Prompt: model.Prompt{Content: "hi"}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(store.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte("\n  ")) {
+		t.Fatalf("expected compact history.json, got indented output")
 	}
 }
