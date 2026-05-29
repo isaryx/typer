@@ -121,17 +121,6 @@ func (s *HistoryStore) attachTrace(sess *model.SessionResult) {
 	}
 }
 
-func (s *HistoryStore) sessionHasTrace(sess model.SessionResult) bool {
-	if len(sess.TypingTrace) > 0 {
-		return true
-	}
-	tc, err := s.ensureTracesLoaded()
-	if err != nil || tc == nil {
-		return false
-	}
-	return len(tc.traceFor(sess.ID)) > 0
-}
-
 func (s *HistoryStore) splitTraceForStorage(result model.SessionResult) (model.SessionResult, []model.ReplayEvent) {
 	stored := result
 	trace := append([]model.ReplayEvent(nil), result.TypingTrace...)

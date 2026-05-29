@@ -22,10 +22,6 @@ func benchWords(n int) []string {
 	return out
 }
 
-func benchPassageContent(n int) string {
-	return strings.Join(benchWords(n), " ")
-}
-
 func benchTypingModel(wordCount int, width int) *typingSessionModel {
 	words := benchWords(wordCount)
 	m := newTypingSessionModel(

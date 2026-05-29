@@ -448,23 +448,6 @@ func (m *typingSessionModel) renderPassageWordSegment(i int, w string) string {
 	return m.renderMergedWordPiece(i, w)
 }
 
-// collectWrappedWordLines lays out words into soft-wrapped lines using plain geometry
-// and styled segments. Prefer ensurePlainLayout + styledViewportLines in the View hot path.
-func (m *typingSessionModel) collectWrappedWordLines(lineWidth int, seg func(int, string) string) ([]string, []int) {
-	pl := buildPlainLayout(m.words, lineWidth)
-	var lines []string
-	for li := 0; li < pl.lineCount; li++ {
-		start := pl.firstWordIdx[li]
-		end := pl.lastWordOnLine(li) + 1
-		parts := make([]string, 0, end-start)
-		for i := start; i < end; i++ {
-			parts = append(parts, seg(i, m.words[i]))
-		}
-		lines = append(lines, m.joinLineParts(parts, start))
-	}
-	return lines, pl.firstWordIdx
-}
-
 func (m *typingSessionModel) renderWords(lineWidth int) string {
 	m.layoutWidth = 0
 	m.plainLayout = buildPlainLayout(m.words, lineWidth)
