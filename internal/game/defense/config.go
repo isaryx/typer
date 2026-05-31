@@ -13,6 +13,7 @@ const (
 	MinWordLen              = 3
 	MaxWordLen              = 12
 	TickInterval            = 16 * time.Millisecond
+	BaseHitFlashDuration    = 200 * time.Millisecond
 
 	fallRampSeconds   = 120.0
 	fallRampBonus     = 0.5

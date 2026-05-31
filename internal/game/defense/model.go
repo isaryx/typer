@@ -54,6 +54,8 @@ type defenseModel struct {
 	aborted bool
 	endedAt time.Time
 	bellOut io.Writer
+
+	baseHitFlashUntil time.Time
 }
 
 func newDefenseModel(pool []string, cfg Config, bellOut io.Writer, seed uint64) *defenseModel {
@@ -156,10 +158,15 @@ func (m *defenseModel) applyTick(now time.Time) {
 	}
 }
 
+func (m *defenseModel) baseHitFlashing(now time.Time) bool {
+	return !m.baseHitFlashUntil.IsZero() && now.Before(m.baseHitFlashUntil)
+}
+
 func (m *defenseModel) loseLife(now time.Time) {
 	if m.lives <= 0 {
 		return
 	}
+	m.baseHitFlashUntil = now.Add(BaseHitFlashDuration)
 	m.lives--
 	if m.lives <= 0 {
 		m.over = true

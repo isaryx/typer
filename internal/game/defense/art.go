@@ -4,19 +4,31 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"typer/internal/session"
 )
 
 const BaseArtRows = 2
 
-var baseArtLines = [BaseArtRows]string{
-	"( ^_^ )",
-	" \\___/ ",
+var baseArtLines = [BaseArtRows][2]string{
+	{"( ^_^ )", "( T_T )"},
+	{" \\___/ ", " \\___/ "},
 }
 
-// CenteredBaseLines returns the robot defender art centered for innerWidth.
-func CenteredBaseLines(innerWidth int) []string {
+// RenderBaseLines returns the robot defender art centered for innerWidth.
+// When flash is true the face turns sad and the art is styled red briefly.
+func RenderBaseLines(innerWidth int, styles session.Styles, flash bool) []string {
+	face := 0
+	if flash {
+		face = 1
+	}
+	styleLine := func(line string) string { return line }
+	if flash {
+		styleLine = func(line string) string { return session.RenderErrorText(styles, line) }
+	}
 	out := make([]string, BaseArtRows)
-	for i, line := range baseArtLines {
+	for i := range baseArtLines {
+		line := baseArtLines[i][face]
 		w := lipgloss.Width(line)
 		if w > innerWidth {
 			out[i] = strings.Repeat(" ", innerWidth)
@@ -26,7 +38,7 @@ func CenteredBaseLines(innerWidth int) []string {
 		if pad < 0 {
 			pad = 0
 		}
-		out[i] = strings.Repeat(" ", pad) + line
+		out[i] = strings.Repeat(" ", pad) + styleLine(line)
 	}
 	return out
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
@@ -89,7 +90,7 @@ func (m *defenseModel) initPlayfieldRows(innerWidth int) []string {
 	rows := make([]string, PlayfieldRows)
 	shield := ShieldRow()
 	baseStart := BaseArtStartRow()
-	baseLines := CenteredBaseLines(innerWidth)
+	baseLines := RenderBaseLines(innerWidth, m.styles, m.baseHitFlashing(time.Now()))
 	for i := 0; i < PlayfieldRows; i++ {
 		if i == shield {
 			rows[i] = session.RenderErrorText(m.styles, strings.Repeat("─", innerWidth))
