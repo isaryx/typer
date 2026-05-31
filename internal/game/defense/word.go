@@ -89,11 +89,21 @@ func FilterWordPool(src []string) []string {
 
 const spawnColumnGap = 1
 
-// lockBracketCols is horizontal space reserved for "[" and "]" when a word is locked.
+// lockBracketCols is the horizontal width of "[" and "]" combined when a word is locked.
 const lockBracketCols = 2
 
+// lockedSpanStart is the leftmost column a locked word may use ("["), one column before the text.
+func lockedSpanStart(col int) int {
+	return col - 1
+}
+
+// lockedSpanEnd is the rightmost column a locked word uses ("]"), at the text's last column + 1.
+func lockedSpanEnd(col, wlen int) int {
+	return col + wlen
+}
+
 func maxSpawnCol(innerWidth, wlen int) int {
-	return innerWidth - wlen - lockBracketCols
+	return innerWidth - wlen - 1
 }
 
 func clampWordCol(col, wlen, innerWidth int) int {
@@ -150,9 +160,8 @@ func overlapsExisting(col, width int, row int, existing []Word) bool {
 			continue
 		}
 		wlen := utf8.RuneCountInString(w.Text)
-		wEnd := w.Col + wlen + lockBracketCols
-		end := col + width + lockBracketCols
-		if col <= wEnd+spawnColumnGap && w.Col <= end+spawnColumnGap {
+		if lockedSpanStart(col) <= lockedSpanEnd(w.Col, wlen)+spawnColumnGap &&
+			lockedSpanStart(w.Col) <= lockedSpanEnd(col, width)+spawnColumnGap {
 			return true
 		}
 	}

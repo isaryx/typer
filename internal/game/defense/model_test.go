@@ -171,7 +171,7 @@ func TestSpawnWordRespectsColumnBounds(t *testing.T) {
 		t.Fatal("expected spawn ok")
 	}
 	wlen := utf8.RuneCountInString(w.Text)
-	if w.Col < 0 || w.Col+wlen+lockBracketCols > 20 {
+	if w.Col < 0 || lockedSpanEnd(w.Col, wlen) >= 20 {
 		t.Fatalf("col=%d text=%q exceeds inner width with brackets", w.Col, w.Text)
 	}
 }

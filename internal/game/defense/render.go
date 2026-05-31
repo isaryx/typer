@@ -74,7 +74,8 @@ func (m *defenseModel) buildPlayfieldRows(innerWidth int) []string {
 		rendered := renderFallingWord(m.styles, w, locked, m.typed)
 		col := w.Col
 		if locked {
-			col = effectiveSegmentCol(col, rendered, innerWidth)
+			// Brackets wrap the word without shifting its text: "[" sits one column left.
+			col = effectiveSegmentCol(lockedSpanStart(col), rendered, innerWidth)
 		}
 		segsByRow[row] = append(segsByRow[row], rowSegment{col: col, rendered: rendered})
 	}

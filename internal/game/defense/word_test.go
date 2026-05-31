@@ -15,9 +15,9 @@ func TestSpawnWordAvoidsSameRowOverlap(t *testing.T) {
 		if !ok {
 			continue
 		}
-		end := w.Col + len(w.Text) + lockBracketCols
-		existEnd := existing[0].Col + len(existing[0].Text) + lockBracketCols
-		if w.Col <= existEnd+spawnColumnGap && existing[0].Col <= end+spawnColumnGap {
+		end := lockedSpanEnd(w.Col, len(w.Text))
+		existEnd := lockedSpanEnd(existing[0].Col, len(existing[0].Text))
+		if lockedSpanStart(w.Col) <= existEnd+spawnColumnGap && lockedSpanStart(existing[0].Col) <= end+spawnColumnGap {
 			t.Fatalf("spawned overlapping word %q at col %d", w.Text, w.Col)
 		}
 	}
