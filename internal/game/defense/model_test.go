@@ -150,6 +150,16 @@ func TestPasteIgnored(t *testing.T) {
 	}
 }
 
+func TestClampWordsToLeftEdge(t *testing.T) {
+	m := testModel(t)
+	m.width = 40
+	m.words = []Word{{ID: 1, Text: "code", Col: 0, Row: 1}}
+	m.clampWordsToWidth(m.innerWidth())
+	if m.words[0].Col != minSpawnCol {
+		t.Fatalf("col=%d want %d", m.words[0].Col, minSpawnCol)
+	}
+}
+
 func TestClampWordsToWidth(t *testing.T) {
 	m := testModel(t)
 	m.width = 40
@@ -171,7 +181,7 @@ func TestSpawnWordRespectsColumnBounds(t *testing.T) {
 		t.Fatal("expected spawn ok")
 	}
 	wlen := utf8.RuneCountInString(w.Text)
-	if w.Col < 0 || lockedSpanEnd(w.Col, wlen) >= 20 {
+	if w.Col < minSpawnCol || lockedSpanEnd(w.Col, wlen) >= 20 {
 		t.Fatalf("col=%d text=%q exceeds inner width with brackets", w.Col, w.Text)
 	}
 }

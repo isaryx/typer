@@ -56,6 +56,23 @@ func TestEffectiveSegmentColClampsLockedWord(t *testing.T) {
 	}
 }
 
+func TestLockedWordAtMinColKeepsPosition(t *testing.T) {
+	styles := session.DefaultStyles()
+	innerWidth := 40
+	w := Word{Text: "code", Col: minSpawnCol}
+	rendered := renderFallingWord(styles, w, true, "")
+	col := effectiveSegmentCol(lockedSpanStart(w.Col), rendered, innerWidth)
+	line := composeWordRow(innerWidth, []rowSegment{{col: col, rendered: rendered}})
+	plain := stripANSI(line)
+	wordIdx := strings.Index(plain, "code")
+	if wordIdx != w.Col {
+		t.Fatalf("word at %d want %d in %q", wordIdx, w.Col, plain)
+	}
+	if plain[0] != '[' {
+		t.Fatalf("opening bracket should fit at left edge, got %q", plain)
+	}
+}
+
 func TestLockedWordAtMaxColKeepsPosition(t *testing.T) {
 	styles := session.DefaultStyles()
 	innerWidth := 40

@@ -92,6 +92,9 @@ const spawnColumnGap = 1
 // lockBracketCols is the horizontal width of "[" and "]" combined when a word is locked.
 const lockBracketCols = 2
 
+// minSpawnCol is the leftmost text column; column 0 is reserved for "[" when locked.
+const minSpawnCol = 1
+
 // lockedSpanStart is the leftmost column a locked word may use ("["), one column before the text.
 func lockedSpanStart(col int) int {
 	return col - 1
@@ -106,16 +109,27 @@ func maxSpawnCol(innerWidth, wlen int) int {
 	return innerWidth - wlen - 1
 }
 
+func spawnColRange(innerWidth, wlen int) (minCol, maxCol int, ok bool) {
+	maxCol = maxSpawnCol(innerWidth, wlen)
+	if maxCol < minSpawnCol {
+		return minSpawnCol, maxCol, false
+	}
+	return minSpawnCol, maxCol, true
+}
+
 func clampWordCol(col, wlen, innerWidth int) int {
-	maxCol := maxSpawnCol(innerWidth, wlen)
-	if maxCol < 0 {
-		return 0
+	minCol, maxCol, ok := spawnColRange(innerWidth, wlen)
+	if !ok {
+		if col < minCol {
+			return minCol
+		}
+		return col
 	}
 	if col > maxCol {
 		return maxCol
 	}
-	if col < 0 {
-		return 0
+	if col < minCol {
+		return minCol
 	}
 	return col
 }
@@ -138,13 +152,13 @@ func spawnWord(pool WordPool, innerWidth int, rng *rand.Rand, nextID int, existi
 		if wlen > innerWidth {
 			continue
 		}
-		maxCol := maxSpawnCol(innerWidth, wlen)
-		if maxCol < 0 {
+		minCol, maxCol, ok := spawnColRange(innerWidth, wlen)
+		if !ok {
 			continue
 		}
-		col := 0
-		if maxCol > 0 {
-			col = rng.IntN(maxCol + 1)
+		col := minCol
+		if maxCol > minCol {
+			col = minCol + rng.IntN(maxCol-minCol+1)
 		}
 		if overlapsExisting(col, wlen, 0, existing) {
 			continue
