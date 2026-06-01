@@ -17,6 +17,12 @@ import (
 
 const defaultRemoteQuoteLimit = 250
 
+// remoteHTTPTimeout applies to fast remotes (type.fit, zenquotes-random).
+const remoteHTTPTimeout = 15 * time.Second
+
+// zenQuotesBatchHTTPTimeout applies only to ZenQuotes /api/quotes batch refills (often slow).
+const zenQuotesBatchHTTPTimeout = 60 * time.Second
+
 // Session source modes (Constraints.Source / --source): where the provider looks first.
 // "remote" tries the enabled remote chain, then cache, then seed; "cache" and "seed" are stricter.
 const (
@@ -44,30 +50,37 @@ type QuoteProviderConfig struct {
 }
 
 type QuoteProvider struct {
-	cache *storage.QuoteCacheStore
-	http  *http.Client
-	cfg   QuoteProviderConfig
+	cache        *storage.QuoteCacheStore
+	zenPool      *storage.ZenQuotesBatchPool
+	http         *http.Client
+	zenBatchHTTP *http.Client
+	cfg          QuoteProviderConfig
 }
 
 // NewQuoteProvider builds the default quote provider: all remotes enabled, production URLs.
-func NewQuoteProvider(cache *storage.QuoteCacheStore, cfg QuoteProviderConfig) *QuoteProvider {
+func NewQuoteProvider(cache *storage.QuoteCacheStore, zenPool *storage.ZenQuotesBatchPool, cfg QuoteProviderConfig) *QuoteProvider {
 	if cfg.URLs == nil {
 		cfg.URLs = map[string]string{}
 	}
 	return &QuoteProvider{
-		cache: cache,
-		cfg:   cfg,
+		cache:   cache,
+		zenPool: zenPool,
+		cfg:     cfg,
 		http: &http.Client{
-			Timeout: 4 * time.Second,
+			Timeout: remoteHTTPTimeout,
+		},
+		zenBatchHTTP: &http.Client{
+			Timeout: zenQuotesBatchHTTPTimeout,
 		},
 	}
 }
 
 // NewQuoteProviderForTesting uses cfg plus an optional HTTP client (defaults to http.DefaultClient if nil).
-func NewQuoteProviderForTesting(cache *storage.QuoteCacheStore, cfg QuoteProviderConfig, client *http.Client) *QuoteProvider {
-	p := NewQuoteProvider(cache, cfg)
+func NewQuoteProviderForTesting(cache *storage.QuoteCacheStore, zenPool *storage.ZenQuotesBatchPool, cfg QuoteProviderConfig, client *http.Client) *QuoteProvider {
+	p := NewQuoteProvider(cache, zenPool, cfg)
 	if client != nil {
 		p.http = client
+		p.zenBatchHTTP = client
 	}
 	return p
 }
@@ -80,6 +93,17 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 	source := strings.ToLower(strings.TrimSpace(c.Source))
 	if source == "" {
 		source = quoteSourceSeed
+	}
+	if source == "auto" {
+		source = quoteSourceRemote
+	}
+
+	if source == quoteSourceRemote && p.zenQuotesBatchEnabled() {
+		if prompt, ok, err := p.tryZenQuotesBatch(ctx); ok {
+			return prompt, err
+		} else if err != nil {
+			return model.Prompt{}, err
+		}
 	}
 
 	quotes, err := p.loadQuotes(ctx, source)
@@ -94,19 +118,48 @@ func (p *QuoteProvider) Next(ctx context.Context, c Constraints) (model.Prompt, 
 	if content == "" {
 		return model.Prompt{}, errors.New("no quotes available")
 	}
-	return model.Prompt{
-		ID:      time.Now().UTC().Format(time.RFC3339Nano),
+	return p.promptFromCachedQuote(storage.CachedQuote{
 		Content: content,
 		Author:  sanitizeQuoteField(q.Author, maxQuoteRuneLen),
 		Source:  q.Source,
+	}), nil
+}
+
+func (p *QuoteProvider) tryZenQuotesBatch(ctx context.Context) (model.Prompt, bool, error) {
+	url := ""
+	if p.cfg.URLs != nil {
+		url = p.cfg.URLs[QuoteRemoteIDZenquotes]
+	}
+	q, ok, err := takeFromZenQuotesBatch(ctx, p.zenPool, p.zenBatchHTTP, url)
+	if err != nil {
+		return model.Prompt{}, false, err
+	}
+	if !ok {
+		return model.Prompt{}, false, nil
+	}
+	return p.promptFromCachedQuote(q), true, nil
+}
+
+func (p *QuoteProvider) promptFromCachedQuote(q storage.CachedQuote) model.Prompt {
+	return model.Prompt{
+		ID:      time.Now().UTC().Format(time.RFC3339Nano),
+		Content: q.Content,
+		Author:  q.Author,
+		Source:  q.Source,
 		Mode:    model.ModeQuote,
-	}, nil
+	}
+}
+
+func (p *QuoteProvider) zenQuotesBatchEnabled() bool {
+	for _, id := range p.enabledRemoteOrder() {
+		if id == QuoteRemoteIDZenquotes {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *QuoteProvider) loadQuotes(ctx context.Context, source string) ([]storage.CachedQuote, error) {
-	if source == "auto" {
-		source = quoteSourceRemote // legacy alias from older sessions / CLI
-	}
 	switch source {
 	case quoteSourceSeed:
 		return p.seedQuotes()
@@ -145,12 +198,15 @@ func (p *QuoteProvider) enabledRemoteOrder() []string {
 	if p.cfg.EnabledRemoteIDs != nil {
 		return p.cfg.EnabledRemoteIDs
 	}
-	return KnownQuoteRemoteIDs()
+	return ResolveEnabledQuoteRemotes(nil, nil)
 }
 
 func (p *QuoteProvider) remoteThenCache(ctx context.Context) ([]storage.CachedQuote, error) {
 	ids := p.enabledRemoteOrder()
 	for _, id := range ids {
+		if id == QuoteRemoteIDZenquotes {
+			continue
+		}
 		h := handlerByRegistryID(id)
 		if h == nil {
 			continue

@@ -22,7 +22,7 @@ func runPlayHangman(ctx context.Context, args []string, stdin io.Reader, stdout 
 	var source string
 	fs.StringVar(&source, "source", "remote", "Quotes: remote|cache|seed.")
 	var quoteSourcesRaw string
-	fs.StringVar(&quoteSourcesRaw, "quote-sources", "", "Comma-separated remote IDs (zenquotes,typefit).")
+	fs.StringVar(&quoteSourcesRaw, "quote-sources", "", "Comma-separated remote IDs (zenquotes, zenquotes-random, typefit).")
 
 	var strikes int
 	fs.IntVar(&strikes, "strikes", hangman.DefaultMaxStrikes, "Gallows stages before loss (must be 6).")
@@ -140,7 +140,7 @@ func printPlayHangmanHelp(out io.Writer) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Flags:")
 	fmt.Fprintln(out, "  --source string           remote|cache|seed (default remote).")
-	fmt.Fprintln(out, "  --quote-sources string    Comma-separated remote IDs (zenquotes, typefit).")
+	fmt.Fprintln(out, "  --quote-sources string    Comma-separated remote IDs (zenquotes, zenquotes-random, typefit).")
 	fmt.Fprintln(out, "  --strikes int             Gallows stages before loss (must be 6).")
 	fmt.Fprintln(out, "  --mistakes-per-strike int Mistake keys per stage (default 1).")
 	fmt.Fprintln(out, "  --no-input                Hide the input line.")

@@ -47,7 +47,11 @@ func NewProvider(mode string, cache *storage.QuoteCacheStore, wordsFile, passage
 		if cache == nil {
 			return nil, errors.New("quotes mode requires cache store")
 		}
-		return NewQuoteProvider(cache, quoteCfg), nil
+		zenPool, err := storage.NewZenQuotesBatchPool()
+		if err != nil {
+			return nil, err
+		}
+		return NewQuoteProvider(cache, zenPool, quoteCfg), nil
 	default:
 		return nil, fmt.Errorf("unsupported mode %q (valid: passage, words, quote)", mode)
 	}

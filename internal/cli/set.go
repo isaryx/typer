@@ -153,7 +153,7 @@ func runSet(args []string, stdout io.Writer) error {
 		var parts []string
 		for _, id := range text.KnownQuoteRemoteIDs() {
 			state := "on"
-			if !settings.QuoteRemoteIsEnabled(id) {
+			if !text.QuoteRemoteEffectiveEnabled(settings.QuoteRemoteEnabled, id) {
 				state = "off"
 			}
 			parts = append(parts, id+"="+state)

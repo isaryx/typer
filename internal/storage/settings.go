@@ -15,7 +15,7 @@ type AppSettings struct {
 	ShowHint *bool `json:"show_hint,omitempty"`
 	// InputPosition is e.g. "bottom-left", "on-top", "on-bottom-dynamic" / "obd" (omitted or empty → on-top-dynamic / otd default).
 	InputPosition string `json:"input_position,omitempty"`
-	// QuoteRemoteEnabled toggles remote quote APIs by registry ID (e.g. zenquotes, typefit).
+	// QuoteRemoteEnabled toggles remote quote APIs by registry ID (e.g. zenquotes, zenquotes-random, typefit).
 	// Nil or missing key means enabled for that source.
 	QuoteRemoteEnabled map[string]bool `json:"quote_remote_enabled,omitempty"`
 }

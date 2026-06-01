@@ -28,7 +28,7 @@ func runStart(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	var source string
 	fs.StringVar(&source, "source", "remote", "Quotes: remote|cache|seed.")
 	var quoteSourcesRaw string
-	fs.StringVar(&quoteSourcesRaw, "quote-sources", "", "Quotes only: comma-separated remote IDs for this session (e.g. zenquotes,typefit). Overrides saved toggles.")
+	fs.StringVar(&quoteSourcesRaw, "quote-sources", "", "Quotes only: comma-separated remote IDs (zenquotes, zenquotes-random, typefit). Overrides saved toggles.")
 
 	var noGhost bool
 	fs.BoolVar(&noGhost, "no-ghost", false, "Skip ghost overlay from best prior run.")

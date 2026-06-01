@@ -63,7 +63,7 @@ func printStartHelp(out io.Writer) {
 		fmt.Fprintf(w, "  %s\t%s\n", "-m, --mode string", "passages|p, words|w, quotes|q (default quotes).")
 		fmt.Fprintf(w, "  %s\t%s\n", "-w, --words int", fmt.Sprintf("Words per prompt (words mode), 1..%d (default 15).", model.MaxWordsPerPrompt))
 		fmt.Fprintf(w, "  %s\t%s\n", "--source string", "Quotes only: remote|cache|seed (default remote).")
-		fmt.Fprintf(w, "  %s\t%s\n", "--quote-sources string", "Quotes only: comma-separated remote IDs this session (zenquotes, typefit); overrides saved toggles.")
+		fmt.Fprintf(w, "  %s\t%s\n", "--quote-sources string", "Quotes only: comma-separated remote IDs (zenquotes, zenquotes-random, typefit); overrides saved toggles.")
 		fmt.Fprintf(w, "  %s\t%s\n", "-s, --strict", "Wrong character does not advance.")
 		fmt.Fprintf(w, "  %s\t%s\n", "-i, --indefinite", "Run another session after the current one finishes.")
 		fmt.Fprintf(w, "  %s\t%s\n", "-f, --finger-hint", "Show QWERTY finger diagram for the next key.")
@@ -77,6 +77,7 @@ func printStartHelp(out io.Writer) {
 	fmt.Fprintln(out, "Examples:")
 	fmt.Fprintln(out, "  typer start --quote-sources typefit")
 	fmt.Fprintln(out, "  typer start --quote-sources zenquotes,typefit")
+	fmt.Fprintln(out, "  typer set --quote-source zenquotes-random=on   # optional faster single-quote API")
 }
 
 func printSetHelp(out io.Writer) {

@@ -12,6 +12,15 @@ import (
 )
 
 const testCacheFilename = "quotes_cache.json"
+const testZenPoolFilename = "zenquotes_batch_pool.json"
+
+func newTestQuoteProvider(t *testing.T, cache *storage.QuoteCacheStore, zenPool *storage.ZenQuotesBatchPool, cfg QuoteProviderConfig, client *http.Client) *QuoteProvider {
+	t.Helper()
+	if zenPool == nil {
+		zenPool = storage.NewZenQuotesBatchPoolAt(filepath.Join(t.TempDir(), testZenPoolFilename))
+	}
+	return NewQuoteProviderForTesting(cache, zenPool, cfg, client)
+}
 
 func quoteCfgTypeFitOnly(url string) QuoteProviderConfig {
 	return QuoteProviderConfig{
@@ -38,7 +47,7 @@ func TestQuoteProviderRemoteThenCache(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -75,7 +84,7 @@ func TestQuoteProviderRemoteFallbackToCache(t *testing.T) {
 		t.Fatalf("seed cache: %v", err)
 	}
 
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("expected fallback to cache, got error: %v", err)
@@ -123,7 +132,7 @@ func TestQuoteProviderRemote_SanitizesContent(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -162,7 +171,7 @@ func TestQuoteProviderRemote_LimitsBodySize(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("expected fallback to seed, got error: %v", err)
@@ -179,7 +188,7 @@ func TestQuoteProviderRemoteFallbackToSeed(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
@@ -192,7 +201,7 @@ func TestQuoteProviderRemoteFallbackToSeed(t *testing.T) {
 
 func TestQuoteProviderEmptySourceDefaultsToSeed(t *testing.T) {
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, QuoteProviderConfig{}, nil)
+	p := newTestQuoteProvider(t, cache, nil, QuoteProviderConfig{}, nil)
 
 	prompt, err := p.Next(context.Background(), Constraints{})
 	if err != nil {
@@ -203,25 +212,110 @@ func TestQuoteProviderEmptySourceDefaultsToSeed(t *testing.T) {
 	}
 }
 
-func TestQuoteProviderZenQuotesJSON(t *testing.T) {
+func TestQuoteProviderZenQuotesBatchPool(t *testing.T) {
+	dir := t.TempDir()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`[{"q":"Hello","a":"World"}]`))
+		_, _ = w.Write([]byte(`[{"q":"Hello","a":"World"},{"q":"Second","a":"Author"}]`))
 	}))
 	defer srv.Close()
 
-	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(dir, testCacheFilename))
+	pool := storage.NewZenQuotesBatchPoolAt(filepath.Join(dir, testZenPoolFilename))
 	cfg := QuoteProviderConfig{
 		EnabledRemoteIDs: []string{QuoteRemoteIDZenquotes},
 		URLs: map[string]string{
 			QuoteRemoteIDZenquotes: srv.URL,
 		},
 	}
-	p := NewQuoteProviderForTesting(cache, cfg, srv.Client())
+	p := newTestQuoteProvider(t, cache, pool, cfg, srv.Client())
+
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("Next: %v", err)
 	}
-	if prompt.Content != "Hello" || prompt.Author != "World" {
+	if prompt.Content != "Hello" && prompt.Content != "Second" {
+		t.Fatalf("prompt = %#v", prompt)
+	}
+	if prompt.Source != quoteSourceZenQuotes {
+		t.Fatalf("source = %q, want zenquotes", prompt.Source)
+	}
+
+	n, err := pool.Len()
+	if err != nil {
+		t.Fatalf("Len: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("pool len = %d, want 1 after first pop", n)
+	}
+
+	stored, err := cache.Load()
+	if err != nil {
+		t.Fatalf("cache Load: %v", err)
+	}
+	if len(stored.Quotes) != 0 {
+		t.Fatalf("zenquotes batch should not write quotes_cache.json, got %d", len(stored.Quotes))
+	}
+}
+
+func TestQuoteProviderZenQuotesBatchConsumesPool(t *testing.T) {
+	dir := t.TempDir()
+	if err := storage.NewZenQuotesBatchPoolAt(filepath.Join(dir, testZenPoolFilename)).Refill([]storage.CachedQuote{
+		{Content: "A", Author: "1", Source: quoteSourceZenQuotes},
+		{Content: "B", Author: "2", Source: quoteSourceZenQuotes},
+	}); err != nil {
+		t.Fatalf("Refill: %v", err)
+	}
+
+	hit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		_, _ = w.Write([]byte(`[{"q":"Nope","a":"X"}]`))
+	}))
+	defer srv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(dir, testCacheFilename))
+	pool := storage.NewZenQuotesBatchPoolAt(filepath.Join(dir, testZenPoolFilename))
+	cfg := QuoteProviderConfig{
+		EnabledRemoteIDs: []string{QuoteRemoteIDZenquotes},
+		URLs:           map[string]string{QuoteRemoteIDZenquotes: srv.URL},
+	}
+	p := newTestQuoteProvider(t, cache, pool, cfg, srv.Client())
+
+	seen := map[string]bool{}
+	for range 2 {
+		prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
+		if err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+		seen[prompt.Content] = true
+	}
+	if !seen["A"] || !seen["B"] {
+		t.Fatalf("expected both pool quotes, got %v", seen)
+	}
+	if hit {
+		t.Fatal("HTTP should not run while pool has quotes")
+	}
+}
+
+func TestQuoteProviderZenQuotesRandomJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"q":"Random one","a":"Author R"}]`))
+	}))
+	defer srv.Close()
+
+	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
+	cfg := QuoteProviderConfig{
+		EnabledRemoteIDs: []string{QuoteRemoteIDZenquotesRandom},
+		URLs: map[string]string{
+			QuoteRemoteIDZenquotesRandom: srv.URL,
+		},
+	}
+	p := newTestQuoteProvider(t, cache, nil, cfg, srv.Client())
+	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+	if prompt.Content != "Random one" || prompt.Author != "Author R" {
 		t.Fatalf("prompt = %#v", prompt)
 	}
 	if prompt.Source != quoteSourceZenQuotes {
@@ -248,7 +342,7 @@ func TestQuoteProviderSkipsZenQuotesWhenDisabled(t *testing.T) {
 			QuoteRemoteIDTypefit:   fitSrv.URL,
 		},
 	}
-	p := NewQuoteProviderForTesting(cache, cfg, fitSrv.Client())
+	p := newTestQuoteProvider(t, cache, nil, cfg, fitSrv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("Next: %v", err)
@@ -268,7 +362,7 @@ func TestQuoteProviderLegacySourceAutoAlias(t *testing.T) {
 	defer srv.Close()
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
-	p := NewQuoteProviderForTesting(cache, quoteCfgTypeFitOnly(srv.URL), srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, quoteCfgTypeFitOnly(srv.URL), srv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "auto"})
 	if err != nil {
 		t.Fatalf("Next: %v", err)
@@ -291,7 +385,7 @@ func TestQuoteProviderFallbackZenToFit(t *testing.T) {
 
 	cache := storage.NewQuoteCacheStoreAt(filepath.Join(t.TempDir(), testCacheFilename))
 	cfg := quoteCfgZenThenFit(badZen.URL, fitSrv.URL)
-	p := NewQuoteProviderForTesting(cache, cfg, fitSrv.Client())
+	p := newTestQuoteProvider(t, cache, nil, cfg, fitSrv.Client())
 	prompt, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("Next: %v", err)
@@ -319,7 +413,7 @@ func TestQuoteProviderEmptyEnabledRemoteIDsSkipsHTTP(t *testing.T) {
 			QuoteRemoteIDZenquotes: srv.URL,
 		},
 	}
-	p := NewQuoteProviderForTesting(cache, cfg, srv.Client())
+	p := newTestQuoteProvider(t, cache, nil, cfg, srv.Client())
 	_, err := p.Next(context.Background(), Constraints{Source: "remote"})
 	if err != nil {
 		t.Fatalf("Next: %v", err)

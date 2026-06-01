@@ -12,8 +12,9 @@ import (
 
 // Stable registry IDs for settings.json and CLI (no dots in keys).
 const (
-	QuoteRemoteIDZenquotes = "zenquotes"
-	QuoteRemoteIDTypefit   = "typefit"
+	QuoteRemoteIDZenquotes       = "zenquotes"
+	QuoteRemoteIDZenquotesRandom = "zenquotes-random"
+	QuoteRemoteIDTypefit         = "typefit"
 )
 
 // Quote provenance labels on Prompt.Source / CachedQuote.Source (which API or bundled list fed the quote).
@@ -56,9 +57,26 @@ type quoteRemoteHandler interface {
 }
 
 // quoteRemoteChain is the global fetch order when multiple remotes are enabled.
+// ZenQuotes batch is served via ZenQuotesBatchPool in QuoteProvider; it is skipped in remoteThenCache.
 var quoteRemoteChain = []quoteRemoteHandler{
-	zenQuotesHandler{},
+	zenQuotesBatchHandler{},
+	zenQuotesRandomHandler{},
 	typeFitHandler{},
+}
+
+func quoteRemoteEnabledByDefault(id string) bool {
+	return id != QuoteRemoteIDZenquotesRandom
+}
+
+// QuoteRemoteEffectiveEnabled reports whether a remote is on given settings.
+// Missing keys use per-source defaults (zenquotes-random defaults off).
+func QuoteRemoteEffectiveEnabled(enabledMap map[string]bool, id string) bool {
+	if enabledMap != nil {
+		if v, ok := enabledMap[id]; ok {
+			return v
+		}
+	}
+	return quoteRemoteEnabledByDefault(id)
 }
 
 // KnownQuoteRemoteIDs returns registry IDs in chain order for CLI validation and display.
@@ -127,10 +145,8 @@ func ResolveEnabledQuoteRemotes(enabledMap map[string]bool, sessionAllowlist []s
 				continue
 			}
 		} else {
-			if enabledMap != nil {
-				if v, ok := enabledMap[id]; ok && !v {
-					continue
-				}
+			if !QuoteRemoteEffectiveEnabled(enabledMap, id) {
+				continue
 			}
 		}
 		out = append(out, id)

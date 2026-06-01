@@ -23,9 +23,29 @@ func TestResolveEnabledQuoteRemotes_settingsOff(t *testing.T) {
 
 func TestResolveEnabledQuoteRemotes_defaultsAllOn(t *testing.T) {
 	got := ResolveEnabledQuoteRemotes(nil, nil)
-	want := KnownQuoteRemoteIDs()
+	want := []string{QuoteRemoteIDZenquotes, QuoteRemoteIDTypefit}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestResolveEnabledQuoteRemotes_zenquotesRandomOptIn(t *testing.T) {
+	got := ResolveEnabledQuoteRemotes(map[string]bool{QuoteRemoteIDZenquotesRandom: true}, nil)
+	want := []string{QuoteRemoteIDZenquotes, QuoteRemoteIDZenquotesRandom, QuoteRemoteIDTypefit}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestQuoteRemoteEffectiveEnabled(t *testing.T) {
+	if !QuoteRemoteEffectiveEnabled(nil, QuoteRemoteIDZenquotes) {
+		t.Fatal("zenquotes should default on")
+	}
+	if QuoteRemoteEffectiveEnabled(nil, QuoteRemoteIDZenquotesRandom) {
+		t.Fatal("zenquotes-random should default off")
+	}
+	if !QuoteRemoteEffectiveEnabled(map[string]bool{QuoteRemoteIDZenquotesRandom: true}, QuoteRemoteIDZenquotesRandom) {
+		t.Fatal("explicit on should win")
 	}
 }
 
