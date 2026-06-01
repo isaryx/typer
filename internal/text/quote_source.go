@@ -124,7 +124,7 @@ func readRemoteGET(ctx context.Context, client *http.Client, url string) ([]byte
 }
 
 // ResolveEnabledQuoteRemotes returns registry IDs to try, in chain order.
-// enabledMap: nil or missing key means true for that ID.
+// enabledMap: missing keys use QuoteRemoteEffectiveEnabled / quoteRemoteEnabledByDefault (zenquotes-random defaults off).
 // When sessionAllowlist is non-empty, only those IDs are included (session wins over settings).
 func ResolveEnabledQuoteRemotes(enabledMap map[string]bool, sessionAllowlist []string) []string {
 	var out []string

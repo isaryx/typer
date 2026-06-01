@@ -41,11 +41,21 @@ func TestQuoteRemoteEffectiveEnabled(t *testing.T) {
 	if !QuoteRemoteEffectiveEnabled(nil, QuoteRemoteIDZenquotes) {
 		t.Fatal("zenquotes should default on")
 	}
+	if !QuoteRemoteEffectiveEnabled(nil, QuoteRemoteIDTypefit) {
+		t.Fatal("typefit should default on")
+	}
 	if QuoteRemoteEffectiveEnabled(nil, QuoteRemoteIDZenquotesRandom) {
 		t.Fatal("zenquotes-random should default off")
 	}
 	if !QuoteRemoteEffectiveEnabled(map[string]bool{QuoteRemoteIDZenquotesRandom: true}, QuoteRemoteIDZenquotesRandom) {
 		t.Fatal("explicit on should win")
+	}
+	disabled := map[string]bool{QuoteRemoteIDZenquotes: false}
+	if QuoteRemoteEffectiveEnabled(disabled, QuoteRemoteIDZenquotes) {
+		t.Fatal("explicit false should disable zenquotes")
+	}
+	if !QuoteRemoteEffectiveEnabled(disabled, QuoteRemoteIDTypefit) {
+		t.Fatal("missing key should use per-ID default (typefit on)")
 	}
 }
 

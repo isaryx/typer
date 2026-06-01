@@ -69,3 +69,56 @@ func TestZenQuotesBatchPoolLoadMissingFileReturnsEmpty(t *testing.T) {
 		t.Fatalf("expected empty quotes, got %d", len(file.Quotes))
 	}
 }
+
+func TestZenQuotesBatchPoolPopMidBatchDoesNotRewriteDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, zenQuotesBatchPoolFilename)
+	pool := NewZenQuotesBatchPoolAt(path)
+	quotes := []CachedQuote{
+		{Content: "A", Author: "1", Source: "zenquotes"},
+		{Content: "B", Author: "2", Source: "zenquotes"},
+		{Content: "C", Author: "3", Source: "zenquotes"},
+	}
+	if err := pool.Refill(quotes); err != nil {
+		t.Fatalf("Refill: %v", err)
+	}
+	if _, ok, err := pool.PopRandom(); err != nil || !ok {
+		t.Fatalf("PopRandom: ok=%v err=%v", ok, err)
+	}
+	n, err := pool.Len()
+	if err != nil {
+		t.Fatalf("Len: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("in-memory len = %d, want 2", n)
+	}
+
+	diskPool := NewZenQuotesBatchPoolAt(path)
+	file, err := diskPool.Load()
+	if err != nil {
+		t.Fatalf("Load from disk: %v", err)
+	}
+	if len(file.Quotes) != 3 {
+		t.Fatalf("on-disk len = %d, want 3 before pool-empty persist", len(file.Quotes))
+	}
+}
+
+func TestZenQuotesBatchPoolPopUntilEmptyPersistsDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, zenQuotesBatchPoolFilename)
+	pool := NewZenQuotesBatchPoolAt(path)
+	if err := pool.Refill([]CachedQuote{{Content: "Only", Author: "X", Source: "zenquotes"}}); err != nil {
+		t.Fatalf("Refill: %v", err)
+	}
+	if _, ok, err := pool.PopRandom(); err != nil || !ok {
+		t.Fatalf("PopRandom: ok=%v err=%v", ok, err)
+	}
+
+	file, err := NewZenQuotesBatchPoolAt(path).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(file.Quotes) != 0 {
+		t.Fatalf("on-disk len = %d, want 0 after last pop", len(file.Quotes))
+	}
+}

@@ -16,7 +16,7 @@ type AppSettings struct {
 	// InputPosition is e.g. "bottom-left", "on-top", "on-bottom-dynamic" / "obd" (omitted or empty → on-top-dynamic / otd default).
 	InputPosition string `json:"input_position,omitempty"`
 	// QuoteRemoteEnabled toggles remote quote APIs by registry ID (e.g. zenquotes, zenquotes-random, typefit).
-	// Nil or missing key means enabled for that source.
+	// Per-ID defaults when a key is missing are defined in text.QuoteRemoteEffectiveEnabled.
 	QuoteRemoteEnabled map[string]bool `json:"quote_remote_enabled,omitempty"`
 }
 
@@ -26,18 +26,6 @@ func (a AppSettings) HintVisible() bool {
 		return true
 	}
 	return *a.ShowHint
-}
-
-// QuoteRemoteIsEnabled reports whether a remote quote registry ID is enabled.
-// Missing key or nil map defaults to true.
-func (a AppSettings) QuoteRemoteIsEnabled(id string) bool {
-	if a.QuoteRemoteEnabled == nil {
-		return true
-	}
-	if v, ok := a.QuoteRemoteEnabled[id]; ok {
-		return v
-	}
-	return true
 }
 
 // InputPlacement returns the parsed input line placement, or DefaultInputPlacement if unset or invalid.
