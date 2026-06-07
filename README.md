@@ -58,6 +58,14 @@ Embed a version when building:
 go build -ldflags "-X typer/internal/version.Version=0.01" -o typer ./cmd/typer
 ```
 
+## Release checklist
+
+- [x] Core features, tests, CI, and multi-platform release builds
+- [x] Security, privacy, and contributor docs
+- [x] Homebrew tap public and install verified (`isaryx/collection`)
+- [ ] Release notes on GitHub (and changelog, if we add one)
+- [ ] Optional: Windows/macOS CI, shell completions, binary signing
+
 ## Project docs
 
 - [Contributing](CONTRIBUTING.md)
