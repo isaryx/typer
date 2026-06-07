@@ -11,7 +11,7 @@ import (
 
 func testModel(t *testing.T) *defenseModel {
 	t.Helper()
-	m := newDefenseModel([]string{"code", "cold", "cat"}, DefaultConfig(), nil, 42)
+	m := newDefenseModel(NewWordPool([]string{"code", "cold", "cat"}), DefaultConfig(), nil, 42)
 	m.width = 80
 	m.height = 24
 	m.startedAt = time.Now()

@@ -5,7 +5,8 @@ Cross-platform typing trainer CLI written in Go.
 ## Features
 
 - Practice in the terminal: **passages**, **words**, or **quotes**
-- Typing games: **hangman** and **defense** (`typer play`)
+- **Words mode** builds each prompt from the bundled word list with a balanced mix of short, medium, and long words (frequency-ranked source; scales with `--words`)
+- Typing games: **hangman** and **defense** (`typer play`) — defense uses the same word list with progressive length as your score rises
 - Speed and accuracy stats; sessions saved on your machine
 - History, stats, and replay when you want to compare runs
 - Offline-friendly with bundled text
@@ -63,4 +64,4 @@ History and settings stay on your device (typical paths include `~/.config/typer
 
 **Session IDs:** [oklog/ulid](https://github.com/oklog/ulid) ([spec](https://github.com/ulid/spec)), Apache-2.0.
 
-**Bundled content:** Words from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english) ([details](assets/WORDS_CREDITS.md)); passages from public-domain proverbs ([details](assets/PASSAGES_CREDITS.md)). For live quotes, ZenQuotes batch (`/api/quotes`) fills a local pool (one quote per session until empty, then refetch); optional `zenquotes-random` uses `/api/random`; [type.fit](https://type.fit/api/quotes) is the fallback. Toggle remotes with `typer set --quote-source` (see `typer credits` for attribution). Bundled `assets/quotes.json` is used when remotes are off or unavailable.
+**Bundled content:** Words from [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english) ([details](assets/WORDS_CREDITS.md)) — shared by words mode and defense; override with `typer set --words-file PATH`. Passages from public-domain proverbs ([details](assets/PASSAGES_CREDITS.md)). For live quotes, ZenQuotes batch (`/api/quotes`) fills a local pool (one quote per session until empty, then refetch); optional `zenquotes-random` uses `/api/random`; [type.fit](https://type.fit/api/quotes) is the fallback. Toggle remotes with `typer set --quote-source` (see `typer credits` for attribution). Bundled `assets/quotes.json` is used when remotes are off or unavailable.

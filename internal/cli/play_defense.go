@@ -9,7 +9,6 @@ import (
 
 	"typer/internal/game/defense"
 	"typer/internal/storage"
-	"typer/internal/text"
 )
 
 func runPlayDefense(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -62,17 +61,12 @@ func runPlayDefense(ctx context.Context, args []string, stdin io.Reader, stdout 
 		wordsFile = settings.WordsFile
 	}
 
-	provider, err := text.NewWordsProvider(wordsFile)
+	pool, err := defense.LoadWordPool(wordsFile)
 	if err != nil {
 		return err
 	}
-	pool := provider.AllWords()
-	filtered := defense.FilterWordPool(pool)
-	if len(filtered) == 0 {
-		return fmt.Errorf("no words between %d and %d characters in word list", defense.MinWordLen, defense.MaxWordLen)
-	}
 
-	result, err := defense.Run(ctx, stdin, stdout, filtered, cfg, seed)
+	result, err := defense.Run(ctx, stdin, stdout, pool, cfg, seed)
 	if err != nil {
 		return err
 	}

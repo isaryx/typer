@@ -10,7 +10,7 @@ import (
 )
 
 // Run starts the defense TUI and returns the final result.
-func Run(ctx context.Context, input io.Reader, output io.Writer, words []string, cfg Config, seed uint64) (Result, error) {
+func Run(ctx context.Context, input io.Reader, output io.Writer, pool WordPool, cfg Config, seed uint64) (Result, error) {
 	if err := ValidateConfig(cfg); err != nil {
 		return Result{}, err
 	}
@@ -20,7 +20,7 @@ func Run(ctx context.Context, input io.Reader, output io.Writer, words []string,
 		bellOut = output
 	}
 
-	m := newDefenseModel(words, cfg, bellOut, seed)
+	m := newDefenseModel(pool, cfg, bellOut, seed)
 	fmt.Fprint(output, "\x1b[2J\x1b[H")
 
 	p := tea.NewProgram(

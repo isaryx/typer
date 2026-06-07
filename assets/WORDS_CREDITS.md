@@ -18,3 +18,10 @@ Bundled cleanup
 
 The bundled list keeps upstream frequency order and omits web-corpus outliers (single-letter tokens,
 abbreviations, tech and brand tokens, given names and place names).
+
+Usage in typer
+--------------
+
+- **Words mode** (`typer start --mode words`): each prompt mixes word lengths (roughly 20% short, 40% core, 27% mid, 13% long) while drawing from this frequency-ranked list.
+- **Defense** (`typer play defense`): uses the same list, filtered to 3–12 characters; shorter words appear first and longer words unlock as your score rises.
+- **Custom list:** `typer set --words-file PATH` replaces the bundled list for both modes.

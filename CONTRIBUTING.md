@@ -22,12 +22,12 @@ Rough map of where things live:
 - `internal/cli` — Subcommands and flags (`root.go` dispatches; other files per command).
 - `internal/session` — Bubble Tea v2 session UI; `typing_state.go` holds core word-lane typing logic (no TUI imports).
 - `internal/model` — Shared types (sessions, prompts, replay trace).
-- `internal/text` — Prompt providers (words, passages, quotes).
+- `internal/text` — Prompt providers (words, passages, quotes). Word lists load via `LoadWordCorpus` (`words_corpus.go`); words mode stratifies prompts by length bucket (`provider_words.go`).
 - `internal/storage` — Local JSON history, settings, quote cache.
   - `history.json` — session metrics and metadata (typing traces stored separately).
   - `traces.json` — sidecar map of session ID → replay trace events (ghost/replay only).
 - `internal/scoring` — WPM and related metrics.
-- `internal/game` — Game modes (`hangman`, `defense`).
+- `internal/game` — Game modes (`hangman`, `defense`). Defense loads the shared word corpus via `LoadWordPool` (`defense/words_loader.go`).
 
 ## Performance
 

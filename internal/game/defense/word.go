@@ -30,6 +30,11 @@ func NewWordPool(src []string) WordPool {
 	return WordPool{byLength: byLength, all: filtered}
 }
 
+// Len returns the number of defense-eligible words in the pool.
+func (p WordPool) Len() int {
+	return len(p.all)
+}
+
 // Shuffle randomizes word order within each length bucket and in all.
 func (p *WordPool) Shuffle(rng *rand.Rand) {
 	shuffleStrings(p.all, rng)

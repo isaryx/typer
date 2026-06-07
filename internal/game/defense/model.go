@@ -58,8 +58,8 @@ type defenseModel struct {
 	baseHitFlashUntil time.Time
 }
 
-func newDefenseModel(pool []string, cfg Config, bellOut io.Writer, seed uint64) *defenseModel {
-	wp := NewWordPool(pool)
+func newDefenseModel(pool WordPool, cfg Config, bellOut io.Writer, seed uint64) *defenseModel {
+	wp := pool
 	if len(wp.all) == 0 {
 		wp = NewWordPool([]string{"code", "type", "word", "cat", "byte", "the"})
 	}
