@@ -9,7 +9,7 @@ import (
 
 const creditsMessage = `Data Credits
 ------------
-- Words mode default list (assets/words.txt): first20hours/google-10000-english
+- Words mode default list (assets/words.txt): first20hours/google-10000-english (no-swears) — see assets/WORDS_CREDITS.md
 - Original corpus source: Google Web Trillion Word Corpus (via LDC), cleaned by Josh Kaufman; subsets by Peter Norvig
 - Passages mode bundled list (assets/passages.txt): Thomas Preston's Dictionary of English Proverbs and Proverbial Phrases (Project Gutenberg #39281)
 - Quotes mode bundled list (assets/quotes.json): curated from dwyl/quotes

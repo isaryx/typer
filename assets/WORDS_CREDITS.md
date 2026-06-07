@@ -4,7 +4,7 @@ Word list attribution
 The file `words.txt` is sourced from:
 
 - Repository: https://github.com/first20hours/google-10000-english
-- Raw list: https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english.txt
+- Source list: https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt
 
 Upstream license notes (from the source project):
 
@@ -12,3 +12,9 @@ Upstream license notes (from the source project):
 - Cleanup/editing by Josh Kaufman.
 - Educational and personal/research use is permitted under the noted licenses and fair use.
 - Commercial use may require licensing from the Linguistic Data Consortium (LDC).
+
+Bundled cleanup
+---------------
+
+The bundled list keeps upstream frequency order and omits web-corpus outliers (single-letter tokens,
+abbreviations, tech and brand tokens, given names and place names).
