@@ -11,6 +11,7 @@ Requirements:
 Clone and run locally:
 
 ```bash
+go run ./cmd/typer              # interactive command menu
 go run ./cmd/typer start --mode passages
 ```
 
@@ -23,6 +24,7 @@ Rough map of where things live:
 - `internal/session` — Bubble Tea v2 session UI; `typing_state.go` holds core word-lane typing logic (no TUI imports).
 - `internal/model` — Shared types (sessions, prompts, replay trace).
 - `internal/text` — Prompt providers (words, passages, quotes). Word lists load via `LoadWordCorpus` (`words_corpus.go`); words mode stratifies prompts by length bucket (`provider_words.go`).
+- `internal/train` — Structured training: curriculum (`assets/lessons.json`), placement, lesson pass/fail, adaptive drills, and `profile.json` persistence.
 - `internal/storage` — Local JSON history, settings, quote cache.
   - `history.json` — session metrics and metadata (typing traces stored separately).
   - `traces.json` — sidecar map of session ID → replay trace events (ghost/replay only).

@@ -5,6 +5,7 @@ Cross-platform typing trainer CLI written in Go.
 ## Features
 
 - Practice in the terminal: **passages**, **words**, or **quotes**
+- **Structured training** (`typer train`): placement test, tiered lessons, and adaptive drills
 - **Words mode** builds each prompt from the bundled word list with a balanced mix of short, medium, and long words (frequency-ranked source; scales with `--words`)
 - Typing games: **hangman** and **defense** (`typer play`) — defense uses the same word list with progressive length as your score rises
 - Speed and accuracy stats; sessions saved on your machine
@@ -28,13 +29,22 @@ brew install typer
 
 ## Usage
 
+Run with no arguments to pick a command interactively (same pattern as `typer play`):
+
+```bash
+typer
+```
+
+Or invoke a command directly:
+
 ```bash
 typer start
-typer play          
+typer train
+typer play
 typer history
 ```
 
-Run `typer --help` or `typer -h` for commands and global flags; use `typer start --help` or `typer start -h` for session flags (same `--help`/`-h` pattern on other commands). From a clone, use `go run ./cmd/typer` instead of `typer`.
+Run `typer --help` or `typer -h` for the full command list; use `typer start --help`, `typer train --help`, and so on for command-specific flags (same `--help`/`-h` pattern on other commands). From a clone, use `go run ./cmd/typer` instead of `typer`.
 
 ## Build
 
@@ -56,7 +66,7 @@ go build -ldflags "-X typer/internal/version.Version=0.01" -o typer ./cmd/typer
 
 ## Privacy & local data
 
-History and settings stay on your device (typical paths include `~/.config/typer` on Linux). Saved sessions include what you typed so you can review them later. By default, practice can show a light ghost from a previous run on the same text; pass `--no-ghost` on `typer start` if you prefer not to.
+History and settings stay on your device (typical paths include `~/.config/typer` on Linux). Saved sessions include what you typed so you can review them later. Training progress is stored separately in `profile.json` (clear with `typer train reset`). By default, practice can show a light ghost from a previous run on the same text; pass `--no-ghost` on `typer start` if you prefer not to.
 
 ## Credits
 

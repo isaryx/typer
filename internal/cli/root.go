@@ -12,8 +12,7 @@ var newHistoryStore = storage.NewHistoryStore
 
 func Execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		printHelp(stdout)
-		return nil
+		return runRootInteractive(ctx, stdin, stdout)
 	}
 
 	switch args[0] {

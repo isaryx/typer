@@ -260,13 +260,16 @@ func TestExtractPresenceFlags(t *testing.T) {
 	}
 }
 
-func TestExecuteNoArgsPrintsHelp(t *testing.T) {
+func TestExecuteNoArgsShowsMenu(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := Execute(context.Background(), nil, strings.NewReader(""), &stdout, &stderr); err != nil {
+	if err := Execute(context.Background(), nil, strings.NewReader("\n"), &stdout, &stderr); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "typer") {
-		t.Fatalf("expected help output, got %q", stdout.String())
+	got := stdout.String()
+	for _, want := range []string{"Choose a command", "start", "train", "play", "history", "stats"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected menu to include %q, got %q", want, got)
+		}
 	}
 }
 

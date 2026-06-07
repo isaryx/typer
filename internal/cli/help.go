@@ -17,9 +17,12 @@ func writeHelpTabwriter(out io.Writer, write func(*tabwriter.Writer)) {
 
 func printHelp(out io.Writer) {
 	fmt.Fprintf(out, "typer %s — terminal typing practice\n\n", version.Version)
+	fmt.Fprintln(out, "Run without a command to choose interactively.")
+	fmt.Fprintln(out)
 
 	writeHelpTabwriter(out, func(w *tabwriter.Writer) {
 		fmt.Fprintln(w, "Usage:")
+		fmt.Fprintln(w, "  typer")
 		fmt.Fprintln(w, "  typer <command> [arguments]")
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Flags:")
