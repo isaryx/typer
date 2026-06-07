@@ -70,6 +70,7 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 		hideHint:       opts.HideHint,
 		inputPlacement: opts.InputPlacement,
 		noAudible:      opts.NoAudible,
+		durationMS:     opts.DurationMS,
 	})
 	if err != nil {
 		return model.SessionResult{}, err
@@ -77,8 +78,12 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	startedAt := tuiResult.StartedAt
 	endedAt := tuiResult.EndedAt
 	typed := tuiResult.TypedText
+	target := tuiResult.TargetText
+	if target == "" {
+		target = prompt.Content
+	}
 
-	metrics := scoring.Compute(prompt.Content, typed, endedAt.Sub(startedAt), scoring.Keystrokes{
+	metrics := scoring.Compute(target, typed, endedAt.Sub(startedAt), scoring.Keystrokes{
 		Total:             tuiResult.TotalKeystrokes,
 		Correct:           tuiResult.CorrectKeystrokes,
 		UncorrectedErrors: tuiResult.UncorrectedErrors,
@@ -88,13 +93,18 @@ func (r *Runner) Run(ctx context.Context, opts model.SessionOptions, input io.Re
 	wpmSamples := append([]float64(nil), tuiResult.WPMSamples...)
 	typingTrace := append([]model.ReplayEvent(nil), tuiResult.TypingTrace...)
 
+	storedPrompt := prompt
+	if tuiResult.TargetText != "" {
+		storedPrompt.Content = tuiResult.TargetText
+	}
+
 	result := model.SessionResult{
 		ID:          newSessionID(startedAt),
-		ContentHash: model.PromptContentHash(prompt.Content),
+		ContentHash: model.PromptContentHash(storedPrompt.Content),
 		StartedAt:   startedAt.UTC(),
 		EndedAt:     endedAt.UTC(),
 		ElapsedMS:   endedAt.Sub(startedAt).Milliseconds(),
-		Prompt:      prompt,
+		Prompt:      storedPrompt,
 		TypedText:   typed,
 		Metrics:     metrics,
 		Aborted:     tuiResult.Aborted,

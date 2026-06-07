@@ -20,6 +20,7 @@ const inputHint = "Hint: type the highlighted word, then Space to advance."
 
 type typingSessionResult struct {
 	TypedText         string
+	TargetText        string // words actually shown (may differ from prompt.Content after train line fill)
 	StartedAt         time.Time
 	EndedAt           time.Time
 	Completed         bool
@@ -34,6 +35,8 @@ type typingSessionResult struct {
 	HangmanOutcome    string // "", "win", "lose"
 	HangmanStage      int
 }
+
+type sessionTickMsg struct{}
 
 type typingSessionModel struct {
 	*typingState
@@ -89,10 +92,23 @@ type typingSessionModel struct {
 	hangman            *hangman.State
 	hangmanOutcome     string
 	hangmanPendingQuit bool
+
+	// Hard line groups from newline-separated prompt content (train lessons).
+	wordHardLine     []int
+	promptSeedContent string // raw multi-line content; refitted to frame width before typing starts
+	wordsFitWidth    int
+
+	durationMS   int
+	timerExpired bool
 }
 
-func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer, hm *hangman.State) *typingSessionModel {
-	words := strings.Fields(prompt.Content)
+func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Time, indefinite bool, replay *model.SessionResult, showReplayUI bool, fingerHint bool, noInput bool, hideHint bool, inputPlacement model.InputPlacement, bellOut io.Writer, hm *hangman.State, durationMS int) *typingSessionModel {
+	innerW := defaultPromptInnerWidth()
+	words, wordHardLine := parsePromptContent(prompt.Content, innerW)
+	promptSeed := ""
+	if strings.Contains(prompt.Content, "\n") {
+		promptSeed = prompt.Content
+	}
 
 	shadowStrict := false
 	var shadowTrace []model.ReplayEvent
@@ -127,17 +143,37 @@ func newTypingSessionModel(prompt model.Prompt, strict bool, now func() time.Tim
 		wordStyleGen:      make([]uint64, n),
 		styledAtGen:       make([]uint64, n),
 		styledSegments:    make([]string, n),
+		wordHardLine:      wordHardLine,
+		promptSeedContent: promptSeed,
+		wordsFitWidth:     innerW,
 		bellOut:           bellOut,
 		hangman:           hm,
+		durationMS:        durationMS,
 	}
 }
 
 func (m *typingSessionModel) Init() tea.Cmd {
+	if m.durationMS > 0 {
+		return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return sessionTickMsg{} })
+	}
 	return nil
 }
 
 func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case sessionTickMsg:
+		if m.durationMS > 0 && !m.startedAt.IsZero() && !m.aborted && !m.timerExpired {
+			elapsed := m.now().Sub(m.startedAt).Milliseconds()
+			if elapsed >= int64(m.durationMS) {
+				m.timerExpired = true
+				m.endedAt = m.now().UTC()
+				return m, tea.Quit
+			}
+		}
+		if m.durationMS > 0 && !m.aborted && !m.timerExpired {
+			return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return sessionTickMsg{} })
+		}
+		return m, nil
 	case shadowTickMsg:
 		return m.applyShadowTick()
 	case tea.WindowSizeMsg:
@@ -145,6 +181,7 @@ func (m *typingSessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.width < 20 {
 			m.width = 20
 		}
+		m.maybeRefitWords()
 		m.invalidatePlainLayout()
 		m.bumpAllWordStyles()
 		return m, nil
@@ -333,6 +370,7 @@ type typingSessionRunOpts struct {
 	inputPlacement model.InputPlacement
 	noAudible      bool
 	hangman        *hangman.State
+	durationMS     int
 }
 
 func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, prompt model.Prompt, o typingSessionRunOpts) (typingSessionResult, error) {
@@ -340,7 +378,7 @@ func runTypingSession(ctx context.Context, input io.Reader, output io.Writer, pr
 	if !o.noAudible {
 		bellOut = output
 	}
-	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement, bellOut, o.hangman)
+	m := newTypingSessionModel(prompt, o.strict, o.now, o.indefinite, o.replayBaseline, o.showReplayUI, o.fingerHint, o.noInput, o.hideHint, o.inputPlacement, bellOut, o.hangman, o.durationMS)
 	if len(m.words) == 0 {
 		return typingSessionResult{}, fmt.Errorf("prompt contains no words")
 	}

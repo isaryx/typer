@@ -18,6 +18,9 @@ func ValidateSessionOptions(o SessionOptions) error {
 	if o.Words > MaxWordsPerPrompt {
 		return fmt.Errorf("words per prompt cannot exceed %d (got %d)", MaxWordsPerPrompt, o.Words)
 	}
+	if o.DurationMS < 0 {
+		return fmt.Errorf("duration cannot be negative (got %d)", o.DurationMS)
+	}
 	return nil
 }
 

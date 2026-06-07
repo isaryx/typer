@@ -29,6 +29,7 @@ func TestCommitCurrentWordStrictMismatchBlocksAdvance(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -55,6 +56,7 @@ func TestAppendRunesStrictRejectsWrongActiveChar(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.appendRunes([]rune("x"))
 	if m.current != "" {
@@ -87,6 +89,7 @@ func TestAppendRunesMistakeWritesBell(t *testing.T) {
 		model.InputPlacement{},
 		&bell,
 		nil,
+		0,
 	)
 	m.appendRunes([]rune("x"))
 	if got := bell.String(); got != "\a" {
@@ -112,6 +115,7 @@ func TestCommitCurrentWordNonStrictAdvancesAndClearsPrompt(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "hullo"
 	m.commitCurrentWord()
@@ -141,6 +145,7 @@ func TestCommitCurrentWordStrictMatchAdvancesAndClearsPrompt(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "hello"
 	m.commitCurrentWord()
@@ -167,6 +172,7 @@ func TestAppendRunesTracksKeystrokeAccuracy(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.appendRunes([]rune("hx"))
 	if m.totalKeystrokes != 2 {
@@ -194,6 +200,7 @@ func TestCommitCurrentWordTracksUncorrectedErrors(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.appendRunes([]rune("hxllo"))
 	m.commitCurrentWord()
@@ -257,6 +264,7 @@ func TestRenderWordsWrapsToTerminalWidth(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 16
 	out := m.renderWords(14)
@@ -279,6 +287,7 @@ func TestWrapWidthCapsWideTerminal(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 200
 	if got := m.wrapWidth(); got != ui.MaxContentWidth {
@@ -304,6 +313,7 @@ func TestViewIncludesPromptModeInMetaLine(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	got := m.View().Content
 	if !strings.Contains(got, "typer · words · non-strict") {
@@ -325,6 +335,7 @@ func TestViewHideHintOmitsHintLine(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	got := m.View().Content
 	if strings.Contains(got, inputHint) {
@@ -349,6 +360,7 @@ func TestViewNoInputPlacesHintUnderHeadingHidesPrompt(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	got := m.View().Content
 	if strings.Contains(got, "> ") {
@@ -384,6 +396,7 @@ func TestAppendRunesStartsTimerOnFirstKeystroke(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	if !m.startedAt.IsZero() {
 		t.Fatalf("expected zero startedAt before typing, got %v", m.startedAt)
@@ -417,6 +430,7 @@ func TestResultUsesEndTimeWhenNoTypingOccurred(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.aborted = true
 	m.endedAt = now.UTC()
@@ -444,6 +458,7 @@ func TestInitReturnsNil(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	if cmd := m.Init(); cmd != nil {
 		t.Fatalf("expected nil init command (terminal cursor handles blink), got %v", cmd)
@@ -461,6 +476,7 @@ func TestInitReturnsNil(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	if cmd := mNoIn.Init(); cmd != nil {
 		t.Fatalf("expected nil init when --no-input, got %v", cmd)
@@ -481,6 +497,7 @@ func TestUpdatePasteAppendsRunes(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	gotModel, _ := m.Update(tea.PasteMsg{Content: "he"})
 	updated := gotModel.(*typingSessionModel)
@@ -503,6 +520,7 @@ func TestUpdateBackspaceRemovesLastRune(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "hé"
 	gotModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
@@ -530,6 +548,7 @@ func TestUpdateSpaceCommitsAndCompletes(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "hello"
 	gotModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -563,6 +582,7 @@ func TestUpdateEnterCommitsAndCompletes(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.current = "go"
 	gotModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -597,8 +617,9 @@ func TestUpdateEscAndCtrlCAbort(t *testing.T) {
 				false,
 				model.InputPlacement{},
 				nil,
-			nil,
-			)
+		nil,
+		0,
+	)
 			gotModel, cmd := m.Update(tc.msg)
 			updated := gotModel.(*typingSessionModel)
 			if !updated.aborted {
@@ -630,6 +651,7 @@ func TestMergedWordPieceShowsGhostWhenUserAheadOfShadow(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	m.wordIndex = 1
@@ -661,6 +683,7 @@ func TestMergedActiveWordShowsGhostWhenUserWordComplete(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	m.wordIndex = 0
@@ -691,6 +714,7 @@ func TestViewHardwareCursorOnPassageForGhostReplay(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 88
 	m.wordIndex = 0
@@ -720,6 +744,7 @@ func TestViewShadowReplayHardwareGhostPlusBlinkBlockOnInputLine(t *testing.T) {
 		model.InputPlacement{}, // bottom row (zero value)
 		nil,
 		nil,
+		0,
 	)
 	m.width = 88
 	m.wordIndex = 0
@@ -749,6 +774,7 @@ func TestViewPlainSessionUsesBlinkBlockNotTerminalCaretOnInput(t *testing.T) {
 		model.InputPlacement{}, // bottom row
 		nil,
 		nil,
+		0,
 	)
 	m.width = 88
 	m.wordIndex = 0
@@ -801,6 +827,7 @@ func TestViewReplayTitleShowsSessionID(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	v := m.View().Content
 	want := "Replay · " + sid + " | net 10.00 wpm"
@@ -827,6 +854,7 @@ func TestViewGhostFromHistoryUsesNormalStartChrome(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	v := m.View().Content
 	if strings.Contains(v, "Replay ·") || strings.Contains(v, "Previous run:") {
@@ -856,6 +884,7 @@ func TestGhostFromHistoryStartsShadowClockAfterFirstKey(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	if !m.hasShadowReplay() {
 		t.Fatal("ghost baseline should populate shadowTrace from TypingTrace")
@@ -890,6 +919,7 @@ func TestViewFingerHintShowsFramedHands(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 88
 	v := m.View().Content
@@ -930,6 +960,7 @@ func TestViewInputLineTopBeforePassageFrame(t *testing.T) {
 		model.InputPlacement{V: model.InputVerticalTop},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	v := m.View().Content
@@ -954,6 +985,7 @@ func TestViewInputLineBottomAfterPassageFrame(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	v := m.View().Content
@@ -978,6 +1010,7 @@ func TestViewInputLineCenterPlacementRenders(t *testing.T) {
 		model.InputPlacement{V: model.InputVerticalBottom, H: model.InputHorizontalCenter},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 120
 	v := m.View().Content
@@ -1000,6 +1033,7 @@ func TestViewHidesInputLineWhenSessionComplete(t *testing.T) {
 		model.InputPlacement{V: model.InputVerticalTop, H: model.InputHorizontalLeft},
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	m.wordIndex = 1
@@ -1019,11 +1053,11 @@ func TestGhostOverlayUsesNonStrictShadow(t *testing.T) {
 		Options:      model.SessionOptionsSnapshot{Strict: true},
 		TypingTrace:  []model.ReplayEvent{{AtMS: 0, Kind: model.ReplayEventKey, Rune: "x"}},
 	}
-	ghost := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, false, false, false, false, model.InputPlacement{}, nil, nil)
+	ghost := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, false, false, false, false, model.InputPlacement{}, nil, nil, 0)
 	if ghost.shadowStrict {
 		t.Fatal("ghost-from-history overlay should use forgiving shadow (shadowStrict=false)")
 	}
-	replay := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, true, false, false, false, model.InputPlacement{}, nil, nil)
+	replay := newTypingSessionModel(model.Prompt{Content: "hi"}, false, time.Now, false, strictReplay, true, false, false, false, model.InputPlacement{}, nil, nil, 0)
 	if !replay.shadowStrict {
 		t.Fatal("typer replay should honor stored strict mode for shadow replay")
 	}
@@ -1044,6 +1078,7 @@ func TestHangmanMistakesAdvanceStageAndLose(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		hm,
+		0,
 	)
 	for i := 0; i < 5; i++ {
 		m.appendRunes([]rune("x"))
@@ -1078,6 +1113,7 @@ func TestHangmanViewPrependsBox(t *testing.T) {
 		model.InputPlacement{},
 		nil,
 		hm,
+		0,
 	)
 	m.width = 80
 	view := m.View().Content

@@ -17,7 +17,7 @@ type passageLayout struct {
 	wordCol        []int
 }
 
-func buildPlainLayout(words []string, lineWidth int) passageLayout {
+func buildPlainLayout(words []string, lineWidth int, wordHardLine []int) passageLayout {
 	if lineWidth < 1 {
 		lineWidth = 1
 	}
@@ -46,7 +46,8 @@ func buildPlainLayout(words []string, lineWidth int) passageLayout {
 		if i > lineStartIdx {
 			sep = plainWordSeparatorWidth
 		}
-		if cur+sep+ww > lineWidth && i > lineStartIdx {
+		hardBreak := i > 0 && len(wordHardLine) == len(words) && wordHardLine[i] != wordHardLine[i-1]
+		if (hardBreak || cur+sep+ww > lineWidth) && i > lineStartIdx {
 			firstWordIdx = append(firstWordIdx, lineStartIdx)
 			lineNum++
 			lineStartIdx = i

@@ -20,7 +20,7 @@ func (m *typingSessionModel) commitCurrentWord() tea.Cmd {
 		if m.bellOut != nil {
 			fmt.Fprint(m.bellOut, "\a")
 		}
-		m.status = ""
+		m.status = "Match the word before advancing."
 		return nil
 	}
 	if !res.advanced {
@@ -82,9 +82,10 @@ func (m *typingSessionModel) result() typingSessionResult {
 	}
 	return typingSessionResult{
 		TypedText:         strings.Join(m.typedWords, " "),
+		TargetText:        strings.Join(m.words, " "),
 		StartedAt:         started,
 		EndedAt:           ended,
-		Completed:         m.isDone() && !m.aborted && m.hangmanOutcome != "lose",
+		Completed:         (m.isDone() || m.timerExpired) && !m.aborted && m.hangmanOutcome != "lose",
 		Aborted:           m.aborted,
 		WPMSamples:        append([]float64(nil), m.wpmSamples...),
 		Strict:            m.strict,

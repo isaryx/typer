@@ -11,4 +11,7 @@ var (
 
 	//go:embed quotes.json
 	QuotesSeed []byte
+
+	//go:embed lessons.json
+	Lessons []byte
 )

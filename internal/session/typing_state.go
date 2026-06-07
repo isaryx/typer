@@ -58,6 +58,19 @@ func newTypingState(words []string, strict bool, now func() time.Time) *typingSt
 	}
 }
 
+func (s *typingState) replaceWords(words []string) {
+	n := len(words)
+	wordRunes := make([][]rune, n)
+	wordLens := make([]int, n)
+	for i, w := range words {
+		wordRunes[i] = []rune(w)
+		wordLens[i] = len(wordRunes[i])
+	}
+	s.words = words
+	s.wordRunes = wordRunes
+	s.wordLens = wordLens
+}
+
 func (s *typingState) syncCurrentString() {
 	s.current = string(s.currentRunes)
 }

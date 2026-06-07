@@ -1,13 +1,69 @@
 package session
 
+import "typer/internal/model"
+
 func (m *typingSessionModel) invalidatePlainLayout() {
 	m.layoutWidth = 0
 }
 
+func (m *typingSessionModel) hardLineCount() int {
+	if len(m.wordHardLine) == 0 {
+		return 0
+	}
+	maxH := 0
+	for _, h := range m.wordHardLine {
+		if h+1 > maxH {
+			maxH = h + 1
+		}
+	}
+	return maxH
+}
+
+// passageViewportHeight returns how many passage rows are visible in the frame.
+// Train lessons with multiple hard lines show all of them (e.g. 4 full drill rows).
+func (m *typingSessionModel) passageViewportHeight() int {
+	if m.prompt.Mode == model.ModeTrain {
+		if n := m.hardLineCount(); n > passageViewportLines {
+			if n > 6 {
+				return 6
+			}
+			return n
+		}
+	}
+	return passageViewportLines
+}
+
+func (m *typingSessionModel) canRefitWords() bool {
+	return m.promptSeedContent != "" && m.wordIndex == 0 && m.current == "" && len(m.typedWords) == 0
+}
+
+func (m *typingSessionModel) replaceWords(words []string) {
+	m.typingState.replaceWords(words)
+}
+
+func (m *typingSessionModel) maybeRefitWords() {
+	if !m.canRefitWords() {
+		return
+	}
+	lw := m.promptInnerWidth()
+	if lw == m.wordsFitWidth {
+		return
+	}
+	words, hard := parsePromptContent(m.promptSeedContent, lw)
+	m.replaceWords(words)
+	m.wordHardLine = hard
+	m.wordsFitWidth = lw
+	n := len(words)
+	m.wordStyleGen = make([]uint64, n)
+	m.styledAtGen = make([]uint64, n)
+	m.styledSegments = make([]string, n)
+}
+
 func (m *typingSessionModel) ensurePlainLayout() passageLayout {
+	m.maybeRefitWords()
 	lw := m.promptInnerWidth()
 	if m.layoutWidth != lw {
-		m.plainLayout = buildPlainLayout(m.words, lw)
+		m.plainLayout = buildPlainLayout(m.words, lw, m.wordHardLine)
 		m.layoutWidth = lw
 	}
 	return m.plainLayout
@@ -60,8 +116,9 @@ func (m *typingSessionModel) styledViewportLines(pl passageLayout) (visibleLines
 		activeW = len(m.words) - 1
 	}
 	activeLine := pl.lineIndexForWord(activeW)
-	start := passageViewportStart(activeLine, pl.lineCount, passageViewportLines)
-	end := start + passageViewportLines
+	vp := m.passageViewportHeight()
+	start := passageViewportStart(activeLine, pl.lineCount, vp)
+	end := start + vp
 	if end > pl.lineCount {
 		end = pl.lineCount
 	}

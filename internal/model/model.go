@@ -9,6 +9,7 @@ const (
 	ModeQuote   = "quote"
 	ModeHangman  = "hangman"
 	ModeDefense  = "defense"
+	ModeTrain    = "train"
 )
 
 type Prompt struct {
@@ -38,6 +39,10 @@ type SessionOptions struct {
 	// RemoteQuoteFetchSplash, when true, shows a loading line while the first prompt loads
 	// (set by typer start for quote mode with --source remote and at least one remote API enabled).
 	RemoteQuoteFetchSplash bool
+	// DurationMS ends the session after this many milliseconds from first keystroke (0 = until prompt complete).
+	DurationMS int
+	// LessonID identifies the training lesson for history (train mode).
+	LessonID string
 }
 
 // SessionResultSchema is bumped when SessionResult JSON fields change incompatibly.
@@ -67,6 +72,8 @@ type SessionOptionsSnapshot struct {
 	Strict     bool   `json:"strict"`
 	Indefinite bool   `json:"indefinite"`
 	FingerHint bool   `json:"finger_hint,omitempty"`
+	LessonID   string `json:"lesson_id,omitempty"`
+	DurationMS int    `json:"duration_ms,omitempty"`
 }
 
 // OptionsSnapshot returns o as a value suitable for JSON in SessionResult.
@@ -78,6 +85,8 @@ func OptionsSnapshot(o SessionOptions) SessionOptionsSnapshot {
 		Strict:     o.Strict,
 		Indefinite: o.Indefinite,
 		FingerHint: o.FingerHint,
+		LessonID:   o.LessonID,
+		DurationMS: o.DurationMS,
 	}
 }
 

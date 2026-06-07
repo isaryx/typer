@@ -32,7 +32,8 @@ func printHelp(out io.Writer) {
 			name string
 			desc string
 		}{
-			{"start", "Start a training session."},
+			{"start", "Start a free practice session."},
+			{"train", "Structured training with lessons and placement test."},
 			{"set", "Configure settings."},
 			{"history", "List recent sessions."},
 			{"replay", "Compete against a previous session."},
@@ -51,7 +52,7 @@ func printHelp(out io.Writer) {
 }
 
 func printStartHelp(out io.Writer) {
-	fmt.Fprintln(out, "Training session.")
+	fmt.Fprintln(out, "Free practice session.")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  typer start [--mode|-m MODE] [--words|-w N] [--source SRC] [--quote-sources IDS]")

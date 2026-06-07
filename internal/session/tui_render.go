@@ -79,7 +79,28 @@ func (m *typingSessionModel) sessionHeadingLine() string {
 	if !m.strict {
 		strictLabel = "non-strict"
 	}
-	return fmt.Sprintf("typer · %s · %s", mode, strictLabel)
+	line := fmt.Sprintf("typer · %s · %s", mode, strictLabel)
+	if label := m.timerRemainingLabel(); label != "" {
+		line += " · " + label
+	}
+	return line
+}
+
+func (m *typingSessionModel) timerRemainingLabel() string {
+	if m.durationMS <= 0 {
+		return ""
+	}
+	if m.startedAt.IsZero() {
+		sec := (int64(m.durationMS) + 999) / 1000
+		return fmt.Sprintf("%ds", sec)
+	}
+	elapsed := m.now().Sub(m.startedAt).Milliseconds()
+	rem := int64(m.durationMS) - elapsed
+	if rem < 0 {
+		rem = 0
+	}
+	sec := (rem + 999) / 1000
+	return fmt.Sprintf("%ds left", sec)
 }
 
 func (m *typingSessionModel) wordCountTopLabel() string {
@@ -216,8 +237,9 @@ func (m *typingSessionModel) activeWordContentOffset(pl passageLayout, activeW i
 		return 0, 0, false
 	}
 	activeLine := pl.lineIndexForWord(activeW)
-	start := passageViewportStart(activeLine, pl.lineCount, passageViewportLines)
-	end := start + passageViewportLines
+	vp := m.passageViewportHeight()
+	start := passageViewportStart(activeLine, pl.lineCount, vp)
+	end := start + vp
 	if end > pl.lineCount {
 		end = pl.lineCount
 	}
@@ -450,7 +472,7 @@ func (m *typingSessionModel) renderPassageWordSegment(i int, w string) string {
 
 func (m *typingSessionModel) renderWords(lineWidth int) string {
 	m.layoutWidth = 0
-	m.plainLayout = buildPlainLayout(m.words, lineWidth)
+	m.plainLayout = buildPlainLayout(m.words, lineWidth, m.wordHardLine)
 	m.layoutWidth = lineWidth
 	lines, _, _ := m.passageWrappedLayout()
 	return strings.Join(lines, "\n")
@@ -611,8 +633,9 @@ func (m *typingSessionModel) ghostCaretViewCoords(passStart int, pl passageLayou
 		return 0, 0, false
 	}
 	ghostLine := pl.lineIndexForWord(wi)
-	vpStart := passageViewportStart(ghostLine, pl.lineCount, passageViewportLines)
-	vpEnd := vpStart + passageViewportLines
+	vp := m.passageViewportHeight()
+	vpStart := passageViewportStart(ghostLine, pl.lineCount, vp)
+	vpEnd := vpStart + vp
 	if vpEnd > pl.lineCount {
 		vpEnd = pl.lineCount
 	}

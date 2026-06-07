@@ -11,7 +11,7 @@ import (
 
 func TestBuildPlainLayoutWrap(t *testing.T) {
 	words := []string{"hello", "world", "foo", "bar"}
-	pl := buildPlainLayout(words, 12)
+	pl := buildPlainLayout(words, 12, nil)
 	if pl.lineCount < 2 {
 		t.Fatalf("lineCount = %d, want multiple lines for width 12", pl.lineCount)
 	}
@@ -32,6 +32,7 @@ func TestPlainLayoutStyledWidthInvariant(t *testing.T) {
 		model.DefaultInputPlacement(),
 		nil,
 		nil,
+		0,
 	)
 	m.width = 80
 	pl := m.ensurePlainLayout()

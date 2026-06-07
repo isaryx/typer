@@ -1,0 +1,563 @@
+{
+  "tiers": {
+    "foundation": {
+      "label": "Foundation",
+      "wpm_floor": 15,
+      "acc_floor": 90
+    },
+    "building": {
+      "label": "Building",
+      "wpm_floor": 30,
+      "acc_floor": 92
+    },
+    "fluent": {
+      "label": "Fluent",
+      "wpm_floor": 45,
+      "acc_floor": 94
+    }
+  },
+  "placement": {
+    "segments": [
+      {
+        "id": "A",
+        "duration_ms": 30000,
+        "strict": false,
+        "content": "ff jj fjf jfj ffj jff fj fjf jfj ff jj fjf jfj ffj jff fj fjf jfj ff jj fjf jfj ffj jff fad jad fjf jfj ff jj fjf jfj ffj jff fj fjf jfj ff jj"
+      },
+      {
+        "id": "B",
+        "duration_ms": 45000,
+        "strict": true,
+        "content": "asdf jkl; qwerty uiop zxcv bnm asdf jkl; qwerty uiop zxcv bnm fad lad jad ask sad desk flask ping pong zip wax vex jazz quiz brown fox asdf jkl; qwerty uiop zxcv bnm fad lad jad ask sad desk flask ping pong zip wax vex jazz quiz"
+      },
+      {
+        "id": "C",
+        "duration_ms": 45000,
+        "strict": true,
+        "content": "the quick brown fox jumps over the lazy dog. pack my box with five dozen liquor jugs. wafting zephyrs vex jim and crazy zebras. sphinx of black quartz judge my vow. zip jazz quiz vex wax the quick brown fox jumps over the lazy dog"
+      }
+    ]
+  },
+  "assessments": [
+    "1.16",
+    "2.12",
+    "3.10"
+  ],
+  "lessons": [
+    {
+      "id": "1.1",
+      "tier": "foundation",
+      "title": "F and J",
+      "keys": [
+        "f",
+        "j",
+        " "
+      ],
+      "prompts": [
+        "ff jj fjf jfj",
+        "fad jad fjf jfj",
+        "jff ffj fj fad",
+        "fjf jad ff jj"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.2",
+      "tier": "foundation",
+      "title": "D and K",
+      "keys": [
+        "d",
+        "k",
+        "f",
+        "j",
+        " "
+      ],
+      "prompts": [
+        "dd kk dkd kdk",
+        "dad kad fd jk",
+        "dkd fd jk dad",
+        "df kj dkd kad"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.3",
+      "tier": "foundation",
+      "title": "S and L",
+      "keys": [
+        "s",
+        "l",
+        "d",
+        "k",
+        "f",
+        "j",
+        " "
+      ],
+      "prompts": [
+        "ss ll sls lsl",
+        "sad lad flask",
+        "sdf jkl sls lad",
+        "flak sad sls jkl"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.4",
+      "tier": "foundation",
+      "title": "A and Semicolon",
+      "keys": [
+        "a",
+        ";",
+        "s",
+        "l",
+        "d",
+        "k",
+        "f",
+        "j",
+        " "
+      ],
+      "prompts": [
+        "aa ;; asa ;a;",
+        "alas fall salad",
+        "ask fall alas",
+        "asa fall ask ;a;"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.5",
+      "tier": "foundation",
+      "title": "G and H",
+      "keys": [
+        "g",
+        "h"
+      ],
+      "prompts": [
+        "gg hh gh hg",
+        "flag hash glad",
+        "glass half flag",
+        "gh hg glad hash"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.6",
+      "tier": "foundation",
+      "title": "R and U",
+      "keys": [
+        "r",
+        "u"
+      ],
+      "prompts": [
+        "rr uu ru ur",
+        "fur rural usual",
+        "ru ur fur surl",
+        "rural fur ur ru"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.7",
+      "tier": "foundation",
+      "title": "E and I",
+      "keys": [
+        "e",
+        "i"
+      ],
+      "prompts": [
+        "ee ii ei ie",
+        "fire rise idle",
+        "file sire fire",
+        "ei ie idle rise"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.8",
+      "tier": "foundation",
+      "title": "W and O",
+      "keys": [
+        "w",
+        "o"
+      ],
+      "prompts": [
+        "ww oo wo ow",
+        "wolf slow flow",
+        "word sole wolf",
+        "wo ow flow slow"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.9",
+      "tier": "foundation",
+      "title": "T and Y",
+      "keys": [
+        "t",
+        "y"
+      ],
+      "prompts": [
+        "tt yy ty yt type yet",
+        "tt yy ty yt type yet",
+        "tt yy ty yt type yet",
+        "tt yy ty yt type yet"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.10",
+      "tier": "foundation",
+      "title": "C and V",
+      "keys": [
+        "c",
+        "v"
+      ],
+      "prompts": [
+        "cc vv cv vc cave vice",
+        "cc vv cv vc cave vice",
+        "cc vv cv vc cave vice",
+        "cc vv cv vc cave vice"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.11",
+      "tier": "foundation",
+      "title": "B and N",
+      "keys": [
+        "b",
+        "n"
+      ],
+      "prompts": [
+        "bb nn bn nb barn none",
+        "bb nn bn nb barn none",
+        "bb nn bn nb barn none",
+        "bb nn bn nb barn none"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.12",
+      "tier": "foundation",
+      "title": "M and Comma",
+      "keys": [
+        "m",
+        ","
+      ],
+      "prompts": [
+        "mm ,, m, ,m calm, comma",
+        "mm ,, m, ,m calm, comma",
+        "mm ,, m, ,m calm, comma",
+        "mm ,, m, ,m calm, comma"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.13",
+      "tier": "foundation",
+      "title": "Q and P",
+      "keys": [
+        "q",
+        "p"
+      ],
+      "prompts": [
+        "qq pp qp pq quick pop",
+        "qq pp qp pq quick pop",
+        "qq pp qp pq quick pop",
+        "qq pp qp pq quick pop"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.14",
+      "tier": "foundation",
+      "title": "Z and X",
+      "keys": [
+        "z",
+        "x"
+      ],
+      "prompts": [
+        "zz xx zx xz zone box",
+        "zz xx zx xz zone box",
+        "zz xx zx xz zone box",
+        "zz xx zx xz zone box"
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.15",
+      "tier": "foundation",
+      "title": "Period and Enter",
+      "keys": [
+        "."
+      ],
+      "prompts": [
+        "a. b. c. end. done.",
+        "a. b. c. end. done.",
+        "a. b. c. end. done.",
+        "a. b. c. end. done."
+      ],
+      "strict": true,
+      "finger_hint": true
+    },
+    {
+      "id": "1.16",
+      "tier": "foundation",
+      "title": "Foundation Assessment",
+      "prompts": [
+        "the quick brown fox jumps over the lazy dog and runs fast"
+      ],
+      "timed_ms": 60000,
+      "strict": true,
+      "assessment": true,
+      "review_on_fail": "1.12",
+      "finger_hint": true
+    },
+    {
+      "id": "2.1",
+      "tier": "building",
+      "title": "Common English Words",
+      "prompt_words": 20,
+      "finger_hint": false
+    },
+    {
+      "id": "2.2",
+      "tier": "building",
+      "title": "Easy Home Row Words",
+      "keys": [
+        "a",
+        "s",
+        "d",
+        "f",
+        "j",
+        "k",
+        "l",
+        ";"
+      ],
+      "prompt_words": 20,
+      "finger_hint": false
+    },
+    {
+      "id": "2.3",
+      "tier": "building",
+      "title": "Top and Bottom Row Mix",
+      "prompt_words": 20,
+      "finger_hint": false
+    },
+    {
+      "id": "2.4",
+      "tier": "building",
+      "title": "Short Sentences",
+      "prompts": [
+        "The sun is bright today.",
+        "We will learn to type well.",
+        "Practice makes perfect every day."
+      ],
+      "finger_hint": false
+    },
+    {
+      "id": "2.5",
+      "tier": "building",
+      "title": "Basic Punctuation",
+      "prompts": [
+        "Hello, world! How are you?",
+        "Yes, I can type; can you?",
+        "Wait... really? That's great!"
+      ],
+      "finger_hint": false
+    },
+    {
+      "id": "2.6",
+      "tier": "building",
+      "title": "Quick Sentences",
+      "prompts": [
+        "She sells seashells by the seashore.",
+        "A journey of a thousand miles begins with a single step.",
+        "To be or not to be, that is the question."
+      ],
+      "finger_hint": false
+    },
+    {
+      "id": "2.7",
+      "tier": "building",
+      "title": "Shift and Capitals",
+      "prompts": [
+        "The Quick Brown Fox Jumps.",
+        "Type Each Word With Care.",
+        "Monday Morning Meeting Notes."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "2.8",
+      "tier": "building",
+      "title": "Mixed Case Words",
+      "prompts": [
+        "JavaScript TypeScript GitHub OpenSource.",
+        "New York London Paris Tokyo.",
+        "Dr Smith Ms Jones Mr Brown."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "2.9",
+      "tier": "building",
+      "title": "Capitalization Drill",
+      "prompts": [
+        "Every Good Boy Does Fine.",
+        "All Cows Eat Grass.",
+        "Read Each Line Aloud Slowly."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "2.10",
+      "tier": "building",
+      "title": "Short Paragraphs",
+      "prompts": [
+        "Learning to type without looking at the keyboard takes patience. Start slowly and focus on accuracy before speed."
+      ],
+      "finger_hint": false
+    },
+    {
+      "id": "2.11",
+      "tier": "building",
+      "title": "Speed Drills",
+      "prompt_words": 25,
+      "timed_ms": 60000,
+      "finger_hint": false
+    },
+    {
+      "id": "2.12",
+      "tier": "building",
+      "title": "Building Assessment",
+      "prompts": [
+        "The ability to type quickly and accurately is a valuable skill in the modern world. Practice regularly to maintain and improve your speed."
+      ],
+      "timed_ms": 60000,
+      "strict": true,
+      "assessment": true,
+      "review_on_fail": "2.10",
+      "finger_hint": false
+    },
+    {
+      "id": "3.1",
+      "tier": "fluent",
+      "title": "Speed Burst",
+      "prompt_words": 30,
+      "timed_ms": 60000,
+      "finger_hint": false
+    },
+    {
+      "id": "3.2",
+      "tier": "fluent",
+      "title": "Consistency Drill",
+      "prompt_words": 25,
+      "timed_ms": 60000,
+      "finger_hint": false
+    },
+    {
+      "id": "3.3",
+      "tier": "fluent",
+      "title": "Numbers",
+      "prompts": [
+        "Call 555-123-4567 before 9am on 12/31/2026.",
+        "Room 404 is on floor 2 near gate 7.",
+        "Order 99 items for $49.99 each."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "3.4",
+      "tier": "fluent",
+      "title": "Symbols",
+      "prompts": [
+        "Email me at user@example.com for details.",
+        "Use #hashtag and @mention wisely.",
+        "Price is $100 (50% off) \u2014 act now!"
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "3.5",
+      "tier": "fluent",
+      "title": "Numbers and Letters",
+      "prompts": [
+        "Version 2.0 released on 2026-06-07 with 100+ fixes.",
+        "IPv4 192.168.0.1 port 8080/tcp.",
+        "Chapter 3 section 4.5 page 127."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "3.6",
+      "tier": "fluent",
+      "title": "Long Passage Accuracy",
+      "prompts": [
+        "It is never too late to be what you might have been. Every expert was once a beginner. Keep typing with focus and your speed will follow naturally over time."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "3.7",
+      "tier": "fluent",
+      "title": "Accuracy Focus",
+      "prompts": [
+        "Precision beats haste. Correct every error before moving on. Accuracy today builds speed tomorrow without bad habits."
+      ],
+      "strict": true,
+      "finger_hint": false
+    },
+    {
+      "id": "3.8",
+      "tier": "fluent",
+      "title": "Skill Builder",
+      "prompts": [
+        "The finest typists combine rhythm, accuracy, and calm focus. They do not rush the keys they know well, and they pause briefly on the keys that challenge them."
+      ],
+      "finger_hint": false
+    },
+    {
+      "id": "3.9",
+      "tier": "fluent",
+      "title": "Advanced Mixed Text",
+      "prompt_words": 30,
+      "timed_ms": 90000,
+      "finger_hint": false
+    },
+    {
+      "id": "3.10",
+      "tier": "fluent",
+      "title": "Fluent Assessment",
+      "prompts": [
+        "Congratulations on reaching the final assessment. Type this passage with your best speed and accuracy. You have learned the full keyboard; now prove your mastery."
+      ],
+      "timed_ms": 60000,
+      "strict": true,
+      "assessment": true,
+      "review_on_fail": "3.8",
+      "finger_hint": false
+    }
+  ]
+}
