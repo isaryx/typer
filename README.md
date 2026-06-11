@@ -91,6 +91,7 @@ go build -ldflags "-X typer/internal/version.Version=dev" -o typer ./cmd/typer
 - [Contributing](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 
 ## Credits
@@ -104,5 +105,6 @@ Run `typer credits` for full attribution. Libraries: [Bubble Tea v2](https://git
 - [x] Core features, tests, CI, and multi-platform release builds
 - [x] Security, privacy, and contributor docs
 - [x] Homebrew tap public and install verified (`isaryx/collection`)
-- [ ] Release notes on GitHub (and changelog, if we add one)
+- [x] Changelog (`CHANGELOG.md`) and agent skill (`.agents/skills/changelog/`)
+- [ ] Release notes on GitHub (copy version section from `CHANGELOG.md` on each tag)
 - [ ] Optional: Windows/macOS CI, shell completions, binary signing

@@ -55,9 +55,13 @@ go vet ./...
 - Keep changes focused and small where possible.
 - Include tests for behavior changes.
 - Update docs when CLI behavior, flags, or defaults change.
+- For **user-visible** changes, add a bullet under `[Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md) (Added / Changed / Fixed / Removed).
 - Use clear commit messages that explain why the change is needed.
 
-## Release Notes and Tags
+## Changelog and releases
 
-- Releases are cut from tags in the form `v*` (for example `v0.0.4`).
-- If your change affects packaging, release behavior, or user-facing output, include a short note in the PR description.
+- [`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/); [`ROADMAP.md`](ROADMAP.md) is forward-looking only.
+- Maintainer plan: [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+- Project agent skill `.agents/skills/changelog/` guides agents for “update changelog” and “cut release X.Y.Z” (Cursor, Codex, Claude Code, and other Agent Skills–compatible tools).
+- Releases use tags `v*` (e.g. `v0.7.0`); CI builds binaries. Paste the matching `CHANGELOG.md` section into the GitHub Release body.
+- We do **not** use git-cliff; entries are curated for CLI users, not copied from commit titles.
